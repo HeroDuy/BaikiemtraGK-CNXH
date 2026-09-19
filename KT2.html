@@ -1,0 +1,2699 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hero Quiz Engine - Pro Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@400;500;600&display=swap');
+        
+        body { 
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0f0f1a 100%);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .font-cyber { font-family: 'Orbitron', sans-serif; }
+
+        /* Neon Effects */
+        .neon-box {
+            background: rgba(16, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid #0ff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .neon-box:hover:not(:disabled) {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), inset 0 0 15px rgba(0, 255, 255, 0.3);
+            border-color: #fff;
+            transform: translateY(-2px);
+        }
+        
+        .neon-text {
+            color: #0ff;
+            text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
+        }
+
+        /* Answer States */
+        .opt-correct {
+            border-color: #0f0 !important;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.8), inset 0 0 15px rgba(0, 255, 0, 0.4) !important;
+            background: rgba(0, 255, 0, 0.15) !important;
+            color: #0f0 !important;
+            text-shadow: 0 0 5px #0f0;
+        }
+        
+        .opt-incorrect {
+            border-color: #f00 !important;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.6), inset 0 0 10px rgba(255, 0, 0, 0.2) !important;
+            background: rgba(255, 0, 0, 0.1) !important;
+            color: #ff4d4d !important;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        /* Animations */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+            animation: fadeUpAnim 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        @keyframes fadeUpAnim {
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        /* Grid Layout */
+        .quiz-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .q-box { grid-column: 1 / -1; min-height: 160px; }
+        
+        @media (max-width: 640px) {
+            .quiz-grid { grid-template-columns: 1fr; gap: 1rem; }
+        }
+
+        /* Background grid overlay */
+        .bg-grid {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(16, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: #0ff; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <!-- Watermark -->
+    <div class="fixed top-4 left-4 z-50 flex items-center gap-2">
+        <i class="fas fa-code text-[#0ff] animate-pulse"></i>
+        <span class="font-cyber font-bold text-sm tracking-widest neon-text uppercase opacity-80">
+            Tạo bởi Hero Duy
+        </span>
+    </div>
+
+    <!-- Màn hình 1: Import Data -->
+    <div id="screen-import" class="flex-grow flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto absolute inset-0 z-10 transition-opacity duration-500">
+        <div class="neon-box rounded-2xl w-full p-6 md:p-10 flex flex-col h-[80vh] fade-up">
+            <h2 class="font-cyber text-2xl md:text-3xl font-bold neon-text mb-2 text-center uppercase tracking-wider">Khởi Tạo Dữ Liệu</h2>
+            <p class="text-gray-400 text-center text-sm mb-6 uppercase tracking-widest">Dán 200 câu hỏi của bạn vào đây</p>
+            
+            <textarea id="import-textarea" class="w-full flex-grow bg-slate-900 border border-[#0ff] rounded-xl p-4 text-slate-300 font-mono text-sm focus:outline-none focus:shadow-[0_0_15px_rgba(0,255,255,0.3)] resize-none mb-6">
+Câu 1: Trên cơ sở những nghiên cứu, phân tích về chủ nghĩa đế quốc, V.I.Lênin phát hiện ra quy luật gì?
+a. Quy luật thống nhất và đấu tranh của các mặt đối lập
+*b. Quy luật phát triển không đều về kinh tế và chính trị của chủ nghĩa tư bản trong thời kỳ chủ nghĩa đế quốc
+c. Cả ba đáp án đều đúng
+d. Quy luật về sự phù hợp của quan hệ sản xuất với tính chất và trình độ của lực lượng sản xuất
+Câu 2: V.I.Lênin đã nhận xét: "Chủ nghĩa xã hội không tưởng không thể vạch ra được lối thoát thực sự" trong tác phẩm nào?
+*a. Ba nguồn gốc và ba bộ phận cấu thành của chủ nghĩa Mác
+b. Tuyên ngôn của Đảng Cộng sản
+c. Luận cương tháng Tư
+d. Chống Đuyrinh
+Câu 3: Phát kiến vĩ đại nào của C.Mác và Ph.Ăngghen là sự khẳng định về phương diện kinh tế sự diệt vong không tránh khỏi của chủ nghĩa tư bản và sự ra đời tất yếu của chủ nghĩa xã hội?
+a. Chủ nghĩa duy vật lịch sử
+b. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+c. Tuyên ngôn của Đảng Cộng sản
+*d. Học thuyết về giá trị thặng dư
+Câu 4: Tác phẩm nào của Ph.Ăngghen thể hiện việc ông chuyển từ thế giới quan duy tâm sang thế giới quan duy vật, từ lập trường dân chủ cách mạng sang lập trường cộng sản chủ nghĩa?
+a. Làm gì?
+b. Chống Đuyrinh
+*c. Tình cảnh nước Anh; Lược thảo khoa học kinh tế - chính trị
+d. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu
+Câu 5: Chủ nghĩa xã hội khoa học được hiểu theo nghĩa rộng là:
+a. Một trong ba bộ phận hợp thành chủ nghĩa Mác - Lênin
+b. Chủ nghĩa xã hội không tưởng phê phán
+*c. Chủ nghĩa Mác - Lênin
+d. Hệ tư tưởng của giai cấp nông dân
+
+
+Câu 6: Mô hình của chế độ xã hội chủ nghĩa ở Liên Xô và Đông Âu sụp đổ vào năm nào?
+*a. 1991
+b. 1990
+c. 1981
+d. 1980
+Câu 7: Phong trào đấu tranh của giai cấp công nhân Lion *mang mục đích chính trị bằng khẩu hiệu nào?*
+a. Cộng hòa hay là chết
+b. Độc lập hay là chết
+c. Sống có việc làm hay là chết trong đấu tranh
+d. Chết trong tự do
+Câu 8: Đánh giá về chủ nghĩa Mác, V.I.Lênin chỉ rõ: Học thuyết của Mác là một học thuyết .... vì nó là một học thuyết chính xác". Hãy điền vào chỗ trống
+a. Toàn vẹn
+*b. Vạn năng
+c. Nhất thành bất biến
+d. Vạn vật
+Câu 9: Chủ nghĩa xã hội khoa học sử dụng phương pháp luận chung nhất gì?
+a. Phương pháp so sánh
+b. Phương pháp kết hợp lịch sử với lôgíc
+*c. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử của triết học Mác - Lênin
+d. Phương pháp khảo sát và phân tích về mặt chính trị- xã hội
+Câu 10: Người có công lao xây dựng chủ nghĩa xã hội hiện thực là:
+a. Ph.Ăngghen
+b. C.Mác
+*c. V.I.Lênin
+d. J.Xtalin
+Câu 11: Cách mạng vô sản trên thực tế được thực hiện bằng con đường nào?
+*a. Bạo lực cách mạng
+b. Con đường chính trị
+c. Con đường hòa bình
+d. Con đường thỏa hiệp
+Câu 12: Các Mác và Ph. Ăngghen đã sử dụng thuật ngữ nào để nói về giai cấp công nhân?
+a. Giai cấp vô sản
+*b. Tất cả các đáp án
+c. Giai cấp công nhân hiện đại
+d. Giai cấp vô sản hiện đại
+Câu 13: Trong cuộc cách mạng về tư tưởng, giai cấp công nhân cần xây dựng và củng cố ý thức hệ tiên tiến của giai cấp mình làm nền tảng tinh thần của xã hội. Ý thức hệ đó là:
+a. Chủ nghĩa hiện sinh
+b. Hệ tư tưởng phong kiến
+c. Hệ tư tưởng dân chủ tư sản
+*d. Chủ nghĩa Mác - Lênin
+Câu 14: Đối diện với quan hệ sản xuất tư bản chủ nghĩa, giai cấp công nhân có đặc trưng cơ bản:
+a. Đại diện cho quan hệ sản xuất tư bản chủ nghĩa
+b. Giai cấp bị mất hết đất đai và nghèo khổ nhất
+*c. Giai cấp công nhân làm thuê hiện đại, vì mất các tư liệu sản xuất của bản thân, nên buộc phải bán sức lao động của mình để kiếm sống
+d. Chủ sở hữu tư liệu sản xuất
+Câu 15: Nội dung kinh tế của sứ mệnh lịch sử giai cấp công nhân:
+a. Phấn đấu cho lợi ích của riêng giai cấp mình
+b. Lợi ích chung và riêng thống nhất
+*c. Đại biểu cho lợi ích chung của xã hội
+d. Phấn đấu cho lợi ích riêng của giai cấp khác
+Câu 16: Nhân tố chủ quan, quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử của mình:
+a. Có sự phát triển của bản thân giai cấp công nhân
+*b. Có sự lãnh đạo của Đảng cộng sản
+c. Có sự liên minh giữa giai cấp công nhân với quần chúng nhân dân
+d. Có sự liên minh công- nông
+Câu 17: Giai cấp công nhân với phương thức lao động công nghiệp trong nền sản xuất tư bản chủ nghĩa, được hiểu là:
+a. Giai cấp nghèo khổ nhất, có trình độ xã hội thấp
+b. Giai cấp có số lượng đông nhất trong dân cư và trình độ xã hội hóa cao
+c. Giai cấp làm giàu cho xã hội trong thời công nghiệp hiện đại
+*d. Những người lao động trực tiếp hay gián tiếp vận hành những công cụ sản xuất có tính chất công nghiệp ngày càng hiện đại, có trình độ xã hội hóa cao
+Câu 18: Vì sao giai cấp công nhân Việt Nam sớm trở thành lực lượng chính trị độc lập?
+a. Kế thừa truyền thống kiên cường bất khuất và yêu nước của dân tộc
+b. Có liên hệ mật thiết với giai cấp nông dân
+c. Kiên định trong giải quyết vấn đề dân tộc trong thời đại mới
+*d. Vì sớm hình thành một chính đảng thực sự cách mạng
+Câu 19: Một trong những điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân:
+a. Sự tăng nhanh về số lượng và chất lượng của giai cấp công nhân
+b. Sự phát triển về chất của bản thân giai cấp công nhân
+*c. Địa vị chính trị - xã hội của giai cấp công nhân
+d. Giai cấp công nhân thành lập chính đảng của mình
+Câu 20: Sứ mệnh lịch sử của giai cấp công nhân về nhiệm vụ văn hóa tư tưởng:
+a. Cải tạo cái cũ, lỗi thời, lạc hậu của các hệ tư tưởng cũ
+b. Xây dựng cùng ý thức hệ tiên tiến của giai cấp công nhân, đó là chủ nghĩa Mác- Lênin
+c. Xây dựng cái mới tiến bộ trong lĩnh vực ý thức tư tưởng, tâm lý, lối sống và đời sống tinh thần của xã hội
+*d. Tất cả các đáp án
+Câu 21: Mục tiêu cao nhất của giai cấp công nhân khi thực hiện sứ mệnh lịch sử của mình là:
+a. Giải phóng lực lượng sản xuất lạc hậu lỗi thời
+b. Giải phóng giai cấp công nhân
+*c. Giải phóng con người
+d. Giải phóng tư liệu sản xuất có trình độ thấp
+Câu 22: Giai cấp công nhân thực hiện sứ mệnh lịch sử của mình thông qua đội tiền phong của mình là:
+a. Công đoàn
+b. Công hội đỏ
+*c. Đảng cộng sản
+d. Đảng cộng hòa
+Câu 23: Theo chủ nghĩa Mác- Lênin, sứ mệnh lịch sử của giai cấp công nhân sẽ hoàn thành bước thứ nhất khi nào?
+a. Giai cấp công nhân giành được nhà máy xí nghiệp của nhà tư bản
+b. Giai cấp công nhân thành lập Đảng cộng sản
+*c. Giai cấp công nhân giành được chính quyền nhà nước
+d. Giai cấp công nhân đấu tranh đòi tăng lượng, giảm giờ làm
+Câu 24: Đặc điểm nào khẳng định giai cấp công nhân là giai cấp tiến bộ nhất?
+*a. Đại biểu cho phương thức sản xuất hiện đại
+b. Có số lượng đông
+c. Có tinh thần quốc tế trong sáng
+d. Có tính tổ chức kỷ luật cao
+Câu 25: Điền từ vào chỗ trống để hoàn thiện luận điểm sau: "Chỉ có giải phóng......thì mới giải phóng được dân tộc; cả hai cuộc giải phóng này chỉ có thể là sự nghiệp của chủ nghĩa cộng sản và cách mạng thế giới" (Hồ Chí Minh).
+a. Nhân dân lao động
+*b. Giai cấp vô sản
+c. Giai cấp công nhân
+d. Giai cấp nông dân
+Câu 26: Đối tượng mà giai cấp công nhân xóa bỏ khi thực hiện sứ mệnh lịch sử của mình là?
+*a. Sở hữu tư nhân tư bản chủ nghĩa về tư liệu sản xuất chủ yếu
+b. Sở hữu tư nhân
+c. Toàn bộ tư liệu sản xuất của chủ nghĩa tư bản
+d. Toàn bộ những gì mà chủ nghĩa tư bản đã tạo ra
+Câu 27: Nội dung sứ mệnh lịch sử giai cấp công nhân là gì?
+a. Giải quyết mâu thuẫn cơ bản trong sơ sở hạ tầng tư bản chủ nghĩa
+*b. Giải quyết mâu thuẫn cơ bản về kinh tế và chính trị trong lòng phương thức sản xuất tư bản chủ nghĩa
+c. Giải quyết mâu thuẫn cơ bản giữa giai cấp công nhân và chủ nghĩa tư bản
+d. Giải quyết mâu thuẫn cơ bản trong kiến trúc thượng tầng tư bản chủ nghĩa
+Câu 28: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là gì?
+*a. Sự kết hợp giữa chủ nghĩa Mác- Lênin với phong trào công nhân
+b. Chủ nghĩa Mác – Lênin kết hợp với phong trào nông dân
+c. Chủ nghĩa Lênin kết hợp với phong trào công nhân
+d. Chủ nghĩa Mác- Lê nin kết hợp với phong trào công nhân và nhân dân lao động
+Câu 29: Theo C.Mác và Ph.Ăngghen, điều kiện tiên quyết để giải phóng người lao động ra khỏi các quan hệ bóc lột tư bản chủ nghĩa là gì?
+a. Tạo ra cách thức tổ chức lao động và kỷ luật lao động mới với năng suất cao
+b. Giải phóng và phát triển toàn diên con người
+c. Tạo ra một nền sản xuất công nghiệp hiện đại
+*d. Xóa bỏ chế độ sở hữu tư bản chủ nghĩa, đồng thời tiến hành thiết lập chế độ công hữu về các tư liệu sản xuất chủ yếu
+Câu 30: Vì sao Đảng cộng sản trở thành đội tiên phong, lãnh tụ chính trị và bộ tham mưu chiến đấu của giai cấp công nhân?*
+a. Là một tổ chức chính trị đạt được nhiều thành quả cách mạng nhất
+*b. Là một tổ chức chính trị tập trung những người công nhân tiên tiến nhất
+c. Là một tổ chức chính trị được giác ngộ lý tưởng cách mạng vô sản
+d. Là một tổ chức chính trị được trang bị lý luận cách mạng của chủ nghĩa Mác-Lênin
+Câu 31: Về kỹ năng, sau khi học xong lý luận về chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội, sinh viên cần đạt được điều gì?
+a. Quan điểm của chủ nghĩa Mác-Lê nin về chủ nghĩa xã hội và sự vận dụng sáng tạo của Đảng cộng sản
+b. Tin tưởng, ủng hộ sự lãnh đạo của Đảng cộng sản Việt Nam
+*c. Bước đầu biết vận dụng những tri thức có được vào phân tích những vấn đề cơ bản của chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ở Việt Nam hiện nay
+d. Khẳng định niềm tin vào chủ nghĩa xã hội
+Câu 32: Đặc điểm của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực văn hóa- tư tưởng là gì?
+a. Tư tưởng tư sản còn ảnh hưởng sâu rộng trong đời sống văn hóa tinh thần
+b. Tồn tại nhiều tàn dư của xã hội cũ
+c. Tư tưởng vô sản và tư tưởng phong kiến là chủ yếu
+*d. Tồn tại nhiều tư tưởng khác nhau, chủ yếu là tư tưởng vô sản và tư tưởng tư sản
+Câu 33: Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa được hiểu như thế nào?
+a. Tiếp thu, kế thừa những thành tựu mà nhân loại đã đạt được dưới chế độ tư bản chủ nghĩa
+b. Bỏ qua tất cả những gì thuộc về chủ nghĩa tư bản
+c. Tạo ra sự biến đổi về chất của xã hội trên tất cả các lĩnh vực của đời sống
+*d. Bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa
+Câu 34: Theo C.Mác và Ph.Ănggen: “Sự phát triển tự do của mỗi người là điều kiện cho sự phát triển tự do của tất cả mọi người” là mục tiêu tổng quát của lịch sử mà xã hội nào sẽ đạt tới?
+a. Chế độ xã hội mới
+b. Chế độ xã hội chủ nghĩa
+*c. Xã hội cộng sản chủ nghĩa
+d. Chủ nghĩa tư bản
+Câu 35: Thực chất của thời kỳ quá độ lên chủ nghĩa xã hội là gì?
+*a. Thời kỳ cải biến cách mạng từ xã hội tiền tư bản chủ nghĩa và tư bản chủ nghĩa sang xã hội xã hội chủ nghĩa
+b. Sắp xếp, bố trí lại các lực lượng sản xuất hiện có
+c. Cải tạo quan hệ xã hội cũ
+d. Xây dựng quan hệ sản xuất mới theo hướng tạo ra sự phát triển cân đối của nền kinh tế, bảo đảm phục vụ ngày càng tốt hơn đời sống nhân dân lao động
+Câu 36: Theo quan điểm của chủ nghĩa Mác- Lê nin, sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế- xã hội cộng sản chủ nghĩa được thực hiện bằng cách nào?
+a. Thông qua cải cách xã hội
+b. Thông qua cách mạng tư sản
+*c. Thông qua thời kỳ quá độ
+d. Thông qua cách mạng xã hội chủ nghĩa
+Câu 37: Trong các đặc trưng của chủ nghĩa xã hội, đặc trưng nào thể hiện thuộc tính bản chất của chủ nghĩa xã hội?*
+a. Có nền kinh tế phát triển cao dựa trên lực lượng hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu
+*b. Chủ nghĩa xã hội giải phóng giai cấp, giải phóng dân tộc, giải phóng xã hội, giải phóng con người, tạo điều kiện để con người phát triển toàn diện
+c. Có nhà nước mang bản chất của giai cấp công nhân, đại biểu cho lợi ích, quyền lực và ý chí của nhân dân lao động
+d. Là xã hội do nhân dân lao động làm chủ
+Câu 38: Những tiền đề vật chất quan trọng nhất cho sự ra đời của chủ nghĩa xã hội là gì?
+a. Giai cấp công nhân trưởng thành và trở thành một lực lượng chính trị độc lập
+b. Sản xuất vật chất phát triển tạo ra một lượng hàng hóa khổng lồ
+*c. Sự phát triển của lực lượng sản xuất và sự trưởng thành của giai cấp công nhân
+d. Sự lớn mạnh của giai cấp vô sản và sự phát triển của quan hệ sản xuất tư bản chủ nghĩa
+Câu 39: Đặc điểm cơ bản của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực xã hội là gì?
+a. Thực hiện thắng lợi sự nghiệp công nghiệp hóa, hiện đại hóa theo định hướng xã hội chủ nghĩa
+b. Đấu tranh ngăn chặn và khắc phục những tư tưởng và hành động sai trái
+*c. Là thời kỳ đấu tranh giai cấp chống áp bức bất công, xóa bỏ tệ nạn xã hội và những tàn dư của xã hội cũ để lại, thiết lập công bằng xã hội trên cơ sở thực hiện nguyên tắc phân phối theo lao động là chủ đạo
+d. Đấu tranh làm thất bại mọi âm mưu và hành động chống phá của các thế lực thù địch, bảo vệ độc lập dân tộc
+Câu 40: Điền vào chỗ trống để hoàn thành nội dung sau: “Xã hội xã hội chủ nghĩa mà nhân dân ta xây dựng là một xã hội dân giàu, nước mạnh, ….” (Văn kiện Đại hội Đảng lần thứ XI)
+*a. dân chủ, công bằng, văn minh
+b. công bằng, dân chủ, văn minh
+c. văn minh, dân chủ, công bằng
+d. công bằng, văn minh, dân chủ
+Câu 41: Bản chất kinh tế của Nhà nước xã hội chủ nghĩa thể hiện ở quan hệ sản xuất gì?
+*a. Quan hệ sản xuất công hữu về tư liệu sản xuất
+b. Quan hệ sản xuất tư nhân về tư liệu sản xuất
+c. Quan hệ sản xuất cá thể về tư liệu sản xuất
+d. Quan hệ sản xuất tàn dư về tư liệu sản xuất
+Câu 42: Bản chất chính trị của Nhà nước xã hội chủ nghĩa được biểu hiện bản chất của giai cấp, tầng lớp nào?
+a. Giai cấp nông dân
+b. Nhân dân lao động
+*c. Giai cấp công nhân
+d. Tầng lớp trí thức
+Câu 43: Dân chủ xã hội chủ nghĩa có mối quan hệ như thế nào với việc xây dựng và hoạt động của nhà nước xã hội chủ nghĩa?
+a. Là cơ sở, điều kiện
+b. Là cơ sở, động lực
+c. Là cơ sở, cách thức
+*d. Là cơ sở, nền tảng
+Câu 44: Nhà nước xã hội chủ nghĩa trở thành công cụ quan trọng trong việc thực thi quyền cơ bản gì của nhân dân?
+a. Quyền làm chủ chính trị của nhân dân
+b. Quyền làm chủ văn hóa của nhân dân
+c. Quyền làm chủ kinh tế của nhân dân
+*d. Quyền làm chủ của nhân dân
+
+Câu 45: Khi coi dân chủ là một giá trị xã hội mang tính toàn nhân loại, Chủ tịch Hồ Chí Minh đã khẳng định quan điểm nào?
+a. Dân chủ là dân làm chủ
+*b. Dân chủ là dân là chủ, dân làm chủ
+c. Dân chủ là dân làm chủ, dân là chủ
+d. Dân chủ là dân là chủ
+Câu 46: Căn cứ vào phạm vi tác động của quyền lực nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng đối nội, chức năng chính trị
+*b. Chức năng đối nội, chức năng đối ngoại
+c. Chức năng giai cấp, chức năng xã hội
+d. Chức năng kinh tế, chức năng chính trị
+Câu 47: Một trong những nội dung tiếp tục xây dựng và hoàn thiện nhà nước pháp quyền xã hội chủ nghĩa ở nước ta hiện nay là gì?
+a. Xây dựng các tổ chức nhà nước vững mạnh
+b. Hoàn thiện các hệ thống giám sát, phản biện xã hội.
+*c. Đấu tranh phòng chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Nâng cao vai trò quản lý của các tổ chức nhà nước
+Câu 48: Sự ra đời của nền dân chủ xã hội chủ nghĩa đánh dấu bước phát triển mới về điều gì?*
+a. Nội dung của dân chủ
+*b. Chất của dân chủ
+c. Lượng của dân chủ
+d. Gía trị của dân chủ
+Câu 49: Dân chủ xã hội chủ nghĩa là bản chất của chế độ ta, vừa là mục tiêu, vừa là động lực của sự phát triển đất nước” Nhận định trên của ai?
+a. Chủ tịch Hồ Chí Minh
+b. V.I.Lênin
+*c. Đảng cộng sản Việt Nam
+d. Các Mác
+Câu 50: Bản chất xã hội của dân chủ xã hội chủ nghĩa được thể hiện như thế nào?
+a. Luôn có sự kế thừa trong bất cứ thời kỳ nào của lịch sử
+b. Hình thành và phát triển một cách tự giác, đặt dưới sự lãnh đạo của giai cấp công nhân thông qua tổ chức Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+c. Hình thành và phát triển dưới sự lãnh đạo của Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+*d. Là sự kết hợp hài hòa về lợi ích giữa cá nhân, tập thể và lợi ích toàn xã hội
+Câu 51: Ai là người kế tục lãnh đạo cao nhất của Đảng Cộng sản Nga và sau đó là Đảng Cộng sản Liên Xô, đồng thời ảnh hưởng nhất đối với Quốc tế III?
+*a. J. Stalin
+b. Mikhail Gorbachev
+c. Nikolay Shervnik
+d. Mikhail Kalinin
+Câu 52: Vào những năm 40 của thế kỷ XX, cùng với quá trình phát triển của nền đại công nghiệp, sự ra đời hai giai cấp có lợi ích cơ bản đối lập nhau là:
+a. Giai cấp tư sản và giai cấp trí thức
+*b. Giai cấp tư sản và giai cấp vô sản
+c. Giai cấp vô sản và giai cấp lãnh đạo
+d. Giai cấp trí thức và giai cấp lãnh đạo
+Câu 53: Tư tưởng xã hội chủ nghĩa không tưởng Pháp đã có những giá trị nhất định nào?
+a. Thể hiện tinh thần phê phán, lên án chế độ quân chủ chuyên chế và chế độ tư bản chủ nghĩa đầy bất công, xung đột...
+b. Thức tỉnh giai cấp công nhân và người lao động trong cuộc đấu tranh chống chế độ quân chủ chuyên chế và chế độ tư bản chủ nghĩa đầy bất công, xung đột.
+c. Đưa ra nhiều luận điểm có giá trị về xã hội tương lai: về tổ chức sản xuất và phân phối sản phẩm xã hội; về sự nghiệp giải phóng phụ nữ, về vai trò lịch sử của nhà nước,…
+*d. Cả 3 đáp án đều đúng
+Câu 54: Tác phẩm “Chống Đuyrinh” là của ai?
+a. C. Mác
+*b. Ph. Ăngghen
+c. V.I. Lênin
+d. Hêghen
+Câu 55: Những nhà tư tưởng tiêu biểu của chủ nghĩa xã hội không tưởng phê phán đầu thế kỷ XIX?
+a. Xanh Ximông, A. Smith, R. Oen
+*b. Xanh Ximông, S. Phuriê, R. Oen
+c. Xanh Ximông, S. Phuriê, D. Ricardo
+d. L. Phoiơbắc, Xanh Ximông, S. Phuriê
+Câu 56: Phát kiến nào của C. Mác và Ăngghen đã khẳng định về phương diện kinh tế sự diệt vong không tránh khỏi của chủ nghĩa tư bản và sự ra đời tất yếu của CNXH?
+a. Chủ nghĩa duy vật lịch sử
+b. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+*c. Học thuyết về giá trị thặng dư
+d. Tuyên ngôn của Đảng Cộng sản
+Câu 57: Tác phẩm nào đã luận chứng rằng “sự phát triển của chủ nghĩa xã hội từ không tưởng đến khoa học và đánh giá công lao của các nhà xã hội chủ nghĩa không tưởng Anh, Pháp”?
+*a. Chống Đuyrinh
+b. Biện chứng của tự nhiên
+c. Tuyên ngôn của Đảng Cộng sản
+d. Làm gì?
+Câu 58: Thông qua tác phẩm nào C. Mác đã chuyển từ thế giới quan duy tâm sang thế giới quan duy vật?
+a. Tuyên ngôn của Đảng Cộng sản (1848)
+*b. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu (1844)
+c. Cách mạng và phản cách mạng ở Đức (1851-1852)
+d. Gia đình thần thánh (1845)
+Câu 59: Chủ nghĩa xã hội khoa học đã sử dụng phương pháp luận chung nhất nào?
+a. Phương pháp kết hợp lịch sử và lôgíc
+b. Phương pháp so sánh
+*c. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử
+d. Phương pháp khảo sát và phân tích về mặt chính trị xã hội dựa trên các điều kiện kinh tế cụ thể
+Câu 60: Tác phẩm "Cương lĩnh xây dựng chủ nghĩa xã hội ở nước Nga" do ai viết?
+*a. V.I. Lênin
+b. Hêghen
+c. Các Mác
+d. Ph. Ăngghen
+Câu 61: Nguồn gốc lý luận trực tiếp cho sự ra đời của chủ nghĩa xã hội khoa học:*
+a. Chủ nghĩa xã hội không tưởng phê phán Pháp
+b. Cả 3 đáp án đều đúng
+c. Kinh tế chính trị học cổ điển Anh
+d. Triết học cổ điển Đức
+Câu 62: Công lao của C. Mác và Ph. Ăngghen trong việc phát triển chủ nghĩa xã hội là gì?
+a. *Phát triển chủ nghĩa xã hội không tưởng thành chủ nghĩa xã hội khoa học
+b. Cả 3 đáp án đều đúng
+c. Xây dựng nhà nước xã hội chủ nghĩa đầu tiên trên thế giới
+d. Phát triển chủ nghĩa xã hội hiện thực thành chủ nghĩa xã hội lý thuyết
+Câu 63: “Giai cấp tư sản, trong quá trình thống trị giai cấp chưa đầy một thế kỷ, đã tạo ra những lực lượng sản xuất nhiều hơn và đồ sộ hơn lực lượng sản xuất của tất cả các thế hệ trước kia gộp lại” là đánh giá của ai?
+a. Lênin
+b. *C. Mác và Ăngghen
+c. A. Smith
+d. Xanh Ximông và Phurie
+Câu 64: V.I.L đã đấu tranh chống các trào lưu phi Mác-xít nhằm mở đường cho điều gì?
+a. Phái Mác-xít hợp pháp xâm nhập vào Nga
+b. Chủ nghĩa dân túy thâm nhập vào Nga
+c. Chủ nghĩa tư bản thâm nhập vào Nga
+*d. Chủ nghĩa Mác thâm nhập vào Nga
+Câu 65: Nhiệm vụ cơ bản của chuyên chính vô sản là gì?
+a. Xây dựng một lực lượng liên minh rộng lớp chống lại giai cấp thống trị
+b. Đấu tranh giành lại quyền và lợi ích hợp pháp cho giai cấp công nhân
+c. Phê phán các quan điểm của kẻ thù xuyên tạc
+d. *Thủ tiêu mọi chế độ người bóc lột người, xây dựng chủ nghĩa xã hội
+
+Câu 66: Phong trào công nhân nào tại châu Âu trong thế kỷ XIX đã có tính chất chính trị rõ rệt và góp phần quan trọng vào sự ra đời của chủ nghĩa xã hội khoa học?
+*a. Phong trào công nhân dệt ở Lion, Pháp
+b. Phong trào Hiến chương ở Anh
+c. Phong trào Hiến chương Đức
+d. Phong trào công nhân dệt ở Xilêdi, Đức
+Câu 67: V.I. Lênin đã chỉ rõ: “Học thuyết của Mác là học thuyết ....”. Điền vào chỗ trống:
+*a. vạn năng
+b. đa năng
+c. sáng thế
+d. toàn năng
+Câu 68: Những nhà triết học nào là đại diện tiêu biểu cho triết học cổ điển Đức?
+a. Xanh Ximông, S. Phurie và R. Oen
+b. C. Mác và Ăngghen
+c. A. Smith và D. Ricardo
+*d. Ph. Hêghen và L. Phoiơbắc
+Câu 69: Sự kiện chính trị nào đánh dấu công lao của V.I. Lênin biến chủ nghĩa xã hội khoa học từ lý luận thành hiện thực?
+*a. Sự ra đời của Nhà nước Xã hội chủ nghĩa đầu tiên trên thế giới - Nhà nước Xô Viết (1917)
+b. Xây dựng lý luận về Đảng cách mạng kiểu mới của giai cấp công nhân
+c. Đấu tranh chống các trào lưu phi Mác-xít
+d. V.I. Lênin viết tác phẩm “Một trong những vấn đề căn bản” năm 1917
+Câu 70: Phong trào Hiến chương của những người lao động ở Anh diễn ra trong khoảng thời gian nào?*
+a. 1838-1848
+b. 1830-1840
+c. 1834-1846
+*d. 1836-1848
+Câu 71: Theo V.I. Lênin, từ khi tác phẩm nào ra đời thì quan niệm duy vật lịch sử không còn là một giả thuyết mà đã trở thành một nguyên lý được chứng minh một cách khoa học?*
+a. Bộ Tư bản
+b. Tuyên Ngôn của Đảng Cộng sản
+c. Tình cảnh nước Anh
+d. Chống Đuyrinh
+
+Câu 72: Về mặt lý luận, nghiên cứu và học tập chủ nghĩa xã hội khoa học nhằm mục đích gì?
+*a. Bao gồm các đáp án
+b. Trang bị các nhận thức chính trị-xã hội và phương pháp luận khoa học về quá trình hình thành, phát triển của chủ nghĩa xã hội.
+c. Định hướng chính trị-xã hội cho hoạt động của Đảng, Nhà nước và nhân dân.
+d. Tạo niềm tin và lý tưởng cách mạng cho giai cấp công nhân.
+Câu 73: Đảng Cộng sản Trung Quốc từ khi thành lập (1/7/1921) đến nay đã trải qua 3 thời kỳ lớn nào?
+a. Thống nhất, cách mạng và cải cách, mở cửa
+*b. Cách mạng, xây dựng và cải cách, mở cửa
+c. Cải cách và xây dựng, mở cửa, cách mạng
+d. Cách mạng, mở cửa, xây dựng và cải cách
+Câu 74: Dưới sự phát triển của nền Đại Công nghiệp, đã xuất hiện mâu thuẫn chính giữa hai giai cấp đó là:
+a. Tư sản và địa chủ
+b. Nông dân và địa chủ
+*c. Tư sản và vô sản
+d. Chủ nô và Nô lệ
+Câu 75: Tác phẩm nào được coi là kim chỉ nam hành động của phong trào cộng sản và công nhân quốc tế?
+a. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+b. Học thuyết về giá trị thặng dư
+c. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu
+*d. Tuyên ngôn của Đảng Cộng sản
+Câu 76: Năm 1831, phong trào đấu tranh của giai cấp công nhân Li-on đã giương cao khẩu hiệu là:
+a. Việc làm cho công nhân
+b. Cộng hòa hay là chết
+*c. Sống có việc làm hay là chết trong đấu tranh
+d. Tất cả vì cuộc sống
+Câu 77: Phương pháp nghiên cứu nào được xem là phương pháp có tính đặc thù của chủ nghĩa xã hội khoa học?
+a. Phương pháp so sánh
+b. Phương pháp kết hợp lịch sử và lôgíc
+c. *Phương pháp khảo sát và phân tích về mặt chính trị-xã hội dựa trên các điều kiện kinh tế-xã hội cụ thể
+d. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử
+Câu 78: Giá trị cốt lõi của tác phẩm Bộ Tư bản mà C. Mác và Ph. Ăngghen viết là gì?
+a. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+*b. Học thuyết về giá trị thặng dư
+c. Cả ba đáp án đều đúng
+d. Chủ nghĩa duy vật lịch sử
+Câu 79: Môn học Chủ nghĩa xã hội khoa học đặt mục tiêu về kỹ năng gì cho sinh viên?
+a. Sinh viên có thái độ tích cực với việc học tập các môn lý luận chính trị
+b. Sinh viên có kiến thức cơ bản hệ thống về sự ra đời, các giai đoạn phát triển; đối tượng, phương pháp và ý nghĩa của việc học tập môn học
+c. Cả ba đáp án đều đúng
+*d. Sinh viên biết vận dụng những tri thức đã học vào giải thích những vấn đề chính trị - xã hội trong đời sống hiện nay
+Câu 80: Nền đại công nghiệp phát triển đã làm cho phương thức sản xuất tư bản chủ nghĩa có bước phát triển như thế nào?
+a. Chậm lại
+b. Không thay đổi
+c. Thần tốc
+*d. Vượt bậc
+Câu 81: Các Mác và Ph. Ăngghen đã sử dụng thuật ngữ nào để nói về giai cấp công nhân?
+a. Giai cấp công nhân hiện đại
+b. Giai cấp vô sản
+*c. Tất cả các đáp án
+d. Giai cấp vô sản hiện đại
+Câu 82: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là sự kết hợp giữa:
+a. Chủ nghĩa Mác - Lênin và liên minh giai cấp tư sản nông dân công nhân
+b. Chủ nghĩa xã hội khoa học với phong trào đấu tranh của giai cấp nông dân
+*c. Chủ nghĩa Mác - Lênin với phong trào công nhân
+d. Chủ nghĩa Mác - Lênin với các cuộc cách mạng tư sản
+Câu 83: Theo C.Mác và Ph.Ăngghen, điều kiện tiên quyết để giải phóng người lao động ra khỏi các quan hệ bóc lột tư bản chủ nghĩa là gì?
+a. Tạo ra cách thức tổ chức lao động và kỷ luật lao động mới với năng suất cao
+b. Tạo ra một nền sản xuất công nghiệp hiện đại
+c. Giải phóng và phát triển toàn diện con người
+*d. Xóa bỏ chế độ sở hữu tư bản chủ nghĩa, đồng thời tiến hành thiết lập chế độ công hữu về các tư liệu sản xuất chủ yếu
+Câu 84: Điểm khác biệt của giai cấp công nhân Việt Nam khi ra đời so với giai cấp công nhân trên thế giới:
+a. Ra đời cùng lúc với giai cấp tư sản Việt Nam
+b. Các đáp án đều sai
+*c. Ra đời trước giai cấp tư sản Việt Nam
+d. Ra đời sau giai cấp tư sản Việt Nam
+Câu 85
+Vì sao Đảng Cộng sản trở thành đội tiên phong, lãnh tụ chính trị và bộ tham mưu chiến đấu của giai cấp công nhân?
+a. Là một tổ chức chính trị được giác ngộ lý tưởng cách mạng vô sản
+*b. Là một tổ chức chính trị tập trung những người công nhân tiên tiến nhất
+c. Là một tổ chức chính trị được trang bị lý luận cách mạng của chủ nghĩa Mác-Lênin
+d. Là một tổ chức chính trị đạt được nhiều thành quả cách mạng nhất
+Câu 86: Nhân tố chủ quan, quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử của mình:
+a. Có sự liên minh công - nông
+b. Có sự phát triển của bản thân giai cấp công nhân
+c. Có sự liên minh giữa giai cấp công nhân với quần chúng nhân dân
+*d. Có sự lãnh đạo của Đảng Cộng sản
+Câu 87: Biến đổi của giai cấp công nhân hiện đại so với giai cấp công nhân thế kỷ 19:
+a. Cả ba đáp án đều đúng
+b. Vẫn là lực lượng sản xuất hàng đầu của xã hội hiện đại
+*c. Xu hướng trung lưu hóa
+d. Vẫn bị giai cấp tư sản và chủ nghĩa tư bản bóc lột giá trị thặng dư
+Câu 88: Phong trào cộng sản và công nhân ở nhiều nước vẫn luôn là lực lượng đi đầu trong các cuộc đấu tranh vì:
+a. Vì dân sinh, dân chủ
+b. Vì hòa bình, hợp tác và phát triển
+*c. Bao gồm các đáp án
+d. Vì tiến bộ xã hội và chủ nghĩa xã hội
+Câu 89: Đâu là điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân?
+*a. Địa vị kinh tế, chính trị-xã hội của giai cấp công nhân
+b. Sự phát triển về số lượng và chất lượng của giai cấp công nhân
+c. Sự ra đời của Đảng Cộng sản
+d. Sự liên minh giai cấp giữa giai cấp công nhân với giai cấp nông dân và các tầng lớp lao động khác
+Câu 90: Cơ sở xã hội và nguồn bổ sung lực lượng quan trọng nhất của Đảng là giai cấp, tầng lớp nào?
+*a. Giai cấp công nhân
+b. Đội ngũ trí thức
+c. Giai cấp nông dân
+d. Tầng lớp doanh nhân
+Câu 91: Sứ mệnh lịch sử của giai cấp công nhân về nhiệm vụ văn hóa tư tưởng:
+a. Cải tạo cái cũ, lỗi thời, lạc hậu của các hệ tư tưởng cũ
+*b. Tất cả các đáp án
+c. Xây dựng cái mới tiến bộ trong lĩnh vực ý thức tư tưởng, tâm lý, lối sống và đời sống tinh thần của xã hội
+d. Xây dựng cùng ý thức hệ tiên tiến của giai cấp công nhân, đó là chủ nghĩa Mác-Lênin
+Câu 92: Sự phát triển của giai cấp công nhân tỷ lệ thuận với sự phát triển kinh tế ở những nước nào?
+a. Các đáp án đều sai
+b. Ở các nước đang phát triển
+*c. Ở các nước phát triển
+d. Ở các nước chậm phát triển
+Câu 93: Nội dung văn hóa, tư tưởng của giai cấp công nhân Việt Nam:
+a. Giữ vững và tăng cường sự lãnh đạo của Đảng
+b. Tăng cường xây dựng, chỉnh đốn Đảng
+c. Tham gia vào sự nghiệp công nghiệp hóa, hiện đại hóa đất nước để phát triển
+*d. Xây dựng con người mới xã hội chủ nghĩa, giáo dục đạo đức cách mạng
+Câu 94: Đối tượng mà giai cấp công nhân xóa bỏ khi thực hiện sứ mệnh lịch sử của mình là?
+a. Sở hữu tư nhân
+*b. Sở hữu tư nhân tư bản chủ nghĩa về tư liệu sản xuất chủ yếu
+c. Toàn bộ tư liệu sản xuất của chủ nghĩa tư bản
+d. Toàn bộ những gì mà chủ nghĩa tư bản đã tạo ra
+Câu 95: Ở các nước tư bản chủ nghĩa, mục tiêu đấu tranh trực tiếp của giai cấp công nhân và nhân dân lao động hiện nay là:
+a. Chống sự trỗi dậy của đội ngũ trí thức
+b. Giành chính quyền về tay giai cấp công nhân và nhân dân lao động
+c. Chống xu hướng trung lưu hóa
+*d. Chống bất công và bất bình đẳng xã hội
+
+Câu 96: Giai cấp công nhân hiện đại tăng nhanh về số lượng, thay đổi lớn về cơ cấu trong nền sản xuất hiện đại do những yếu tố:
+a. Cách mạng công nghiệp lần thứ tư
+b. Hội nhập quốc tế
+c. Bối cảnh mới của toàn cầu hóa
+*d. Bao gồm các đáp án
+Câu 97: Giai cấp công nhân với phương thức lao động công nghiệp trong nền sản xuất tư bản chủ nghĩa, được hiểu là:
+a. Giai cấp làm giàu cho xã hội trong thời công nghiệp hiện đại
+b. Giai cấp có số lượng đông nhất trong dân cư và trình độ xã hội hóa cao
+c. Giai cấp nghèo khổ nhất, có trình độ xã hội thấp
+*d. Những người lao động trực tiếp hay gián tiếp vận hành những công cụ sản xuất có tính chất công nghiệp ngày càng hiện đại, có trình độ xã hội hóa cao
+Câu 98: Giai cấp công nhân được các nhà kinh điển xác định theo 2 phương diện nào?
+a. Chính trị - xã hội và tư tưởng xã hội
+*b. Kinh tế - xã hội và chính trị - xã hội
+c. Kinh tế - xã hội và tư tưởng - xã hội
+d. Kinh tế - xã hội và văn hóa xã hội
+Câu 99: Hoàn thành luận điểm của C. Mác và Ph. Ăngghen: “Tất cả các giai cấp khác đều suy tàn và tiêu vong cùng với sự phát triển của đại công nghiệp, còn giai cấp vô sản lại là (.....) của bản thân nền đại công nghiệp.”
+*a. Sản phẩm
+b. Hiện thân
+c. Thành tựu
+d. Nền tảng
+Câu 100: Theo chủ nghĩa Mác-Lênin, sứ mệnh lịch sử của giai cấp công nhân sẽ hoàn thành bước thứ nhất khi nào?
+*a. Giai cấp công nhân giành được chính quyền nhà nước
+b. Giai cấp công nhân đấu tranh đòi tăng lương, giảm giờ làm
+c. Giai cấp công nhân thành lập Đảng Cộng sản
+d. Giai cấp công nhân giành được nhà máy xí nghiệp của nhà tư bản
+Câu 101: Nội dung chính trị - xã hội của giai cấp công nhân Việt Nam:
+a. Xây dựng hệ giá trị văn hóa và con người Việt Nam, hoàn thiện nhân cách
+b. Thực hiện thắng lợi mục tiêu công nghiệp hóa, hiện đại hóa
+*c. Giữ vững bản chất giai cấp công nhân của Đảng
+d. Rèn luyện lối sống, tác phong công nghiệp, văn minh hiện đại
+
+Câu 102: Yếu tố nào là hạt nhân chính trị quan trọng của giai cấp công nhân theo chủ nghĩa Mác-Lênin?
+a. Nhà nước Tư sản
+b. Các công đoàn
+c. Các nghiệp đoàn tư nhân
+*d. Đảng Cộng sản
+Câu 103: Đâu là cơ sở khách quan để giai cấp công nhân hiện đại phát triển mạnh mẽ cả về số lượng và chất lượng?
+a. Tri thức hóa
+*b. Công nghiệp hóa
+c. Nông nghiệp hóa
+d. Trung lưu hóa
+Câu 104: Đối diện với quan hệ sản xuất tư bản chủ nghĩa, giai cấp công nhân có đặc trưng cơ bản:
+*a. Giai cấp công nhân làm thuê hiện đại, vì mất các tư liệu sản xuất của bản thân, nên buộc phải bán sức lao động của mình để kiếm sống
+b. Đại diện cho quan hệ sản xuất tư bản chủ nghĩa
+c. Chủ sở hữu tư liệu sản xuất
+d. Giai cấp bị mất hết đất đai và nghèo khổ nhất
+Câu 105: Vì sao giai cấp công nhân Việt Nam sớm trở thành lực lượng chính trị độc lập?
+a. Kiên định trong giải quyết vấn đề dân tộc trong thời đại mới
+b. Kế thừa truyền thống kiên cường bất khuất và yêu nước của dân tộc
+c. Có liên hệ mật thiết với giai cấp nông dân
+*d. Vì sớm hình thành một chính đảng thực sự cách mạng
+Câu 106: Theo quan điểm của C.Mác và Ph.Ăngghen: Trong công trường thủ công và trong nghề thủ công, người công nhân sử dụng công cụ của mình, còn trong công xưởng thì người công nhân:*
+a. Không phải sử dụng máy móc
+*b. Phải phục vụ máy móc
+c. Phải phục chế máy móc
+d. Phải phục tùng máy móc
+Câu 107: Ở các nước xã hội chủ nghĩa, giai cấp công nhân đóng vai trò gì để thực hiện nội dung kinh tế giải phóng lực lượng sản xuất?
+*a. Nòng cốt
+b. Chủ chốt
+c. Chủ đạo
+d. Cả ba đều đúng
+Câu 108: Theo C. Mác và Ph. Ăngghen, bộ phận công nhân nào là tiêu biểu cho giai cấp công nhân hiện đại?
+a. Công nhân hầm mỏ
+b. Công nhân công trường thủ công
+c. Công nhân công trường thủ công
+*d. Công nhân công nghiệp công xưởng
+Câu 109: Điểm tương đối ổn định của giai cấp công nhân hiện nay so với giai cấp công nhân thế kỷ 19:
+*a. Là lực lượng sản xuất hàng đầu của xã hội hiện đại
+b. Xu hướng “trung lưu hóa”
+c. Là những người chủ nhỏ
+d. Xu hướng “trí tuệ hóa”
+Câu 110: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là gì?
+a. Chủ nghĩa Mác – Lênin kết hợp với phong trào nông dân
+b. Chủ nghĩa Lênin kết hợp với phong trào công nhân
+c. Chủ nghĩa Mác-Lênin kết hợp với phong trào công nhân và nhân dân lao động
+*d. Sự kết hợp giữa chủ nghĩa Mác-Lênin với phong trào công nhân
+Câu 111: Giai cấp công nhân Việt Nam được Đảng xác định là một lực lượng xã hội như thế nào?
+a. Một lực lượng xã hội to lớn, đã phát triển hoàn toàn, chỉ bao gồm những người lao động có trình độ cao
+b. Một lực lượng xã hội to lớn, đã phát triển hoàn toàn, chỉ bao gồm những người lao động trí óc
+*c. Một lực lượng xã hội to lớn, đang phát triển, bao gồm những người lao động chân tay và trí óc
+d. Một lực lượng xã hội nhỏ, chưa phát triển, bao gồm những người lao động chân tay và trí óc
+Câu 112: Cách mạng vô sản trên thực tế được thực hiện bằng con đường nào?
+a. Con đường thỏa hiệp
+b. Con đường chính trị
+*c. Bạo lực cách mạng
+d. Con đường hòa bình
+Câu 113: “Chỉ có giải phóng......thì mới giải phóng được dân tộc; cả hai cuộc giải phóng này chỉ có thể là sự nghiệp của chủ nghĩa cộng sản và cách mạng thế giới” (Hồ Chí Minh).
+a. Giai cấp nông dân
+*b. Giai cấp vô sản
+c. Nhân dân lao động
+d. Giai cấp công nhân
+Câu 114: Nội dung kinh tế của sứ mệnh lịch sử giai cấp công nhân:
+a. Phấn đấu cho lợi ích riêng của giai cấp khác
+*b. Đại biểu cho lợi ích chung của xã hội
+c. Phấn đấu cho lợi ích của riêng giai cấp mình
+d. Lợi ích chung và riêng thống nhất
+Câu 115: Giai cấp công nhân thực hiện sứ mệnh lịch sử của mình thông qua đội tiền phong của mình là:
+a. Công đoàn
+*b. Đảng Cộng sản
+c. Công hội đỏ
+d. Đảng cộng hòa
+Câu 116: Ở các nước tư bản chủ nghĩa, đấu tranh giành chính quyền về tay giai cấp công nhân và nhân dân lao động là mục tiêu đấu tranh:*
+a. Bạo loạn
+b. Trực tiếp
+c. Gián tiếp
+*d. Lâu dài
+Câu 117: Một trong những điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân:
+a. Sự phát triển về chất của bản thân giai cấp công nhân
+b. Sự tăng nhanh về số lượng và chất lượng của giai cấp công nhân
+*c. Địa vị chính trị - xã hội của giai cấp công nhân
+d. Giai cấp công nhân thành lập chính đảng của mình
+Câu 118: Nội dung sứ mệnh lịch sử giai cấp công nhân là gì?
+*a. Giải quyết mâu thuẫn cơ bản về kinh tế và chính trị trong lòng phương thức sản xuất tư bản chủ nghĩa
+b. Giải quyết mâu thuẫn cơ bản trong cơ sở hạ tầng tư bản chủ nghĩa
+c. Giải quyết mâu thuẫn cơ bản trong kiến trúc thượng tầng tư bản chủ nghĩa
+d. Giải quyết mâu thuẫn cơ bản giữa giai cấp công nhân và chủ nghĩa tư bản
+Câu 119: Trong chăm lo xây dựng giai cấp công nhân Việt Nam, công đoàn có vai trò:
+*a. Quan trọng trực tiếp
+b. Quyết định
+c. Quan trọng gián tiếp
+d. Không quan trọng
+Câu 120: Đặc điểm nào khẳng định giai cấp công nhân là giai cấp tiến bộ nhất?
+*a. Đại biểu cho phương thức sản xuất hiện đại
+b. Có tính tổ chức kỷ luật cao
+c. Có tinh thần quốc tế trong sáng
+d. Có số lượng đông
+Câu 121: Theo Đại hội lần thứ XIII của Đảng, xây dựng giai cấp công nhân Việt Nam trong thời kỳ đẩy mạnh công nghiệp hóa, hiện đại hóa đất nước bao gồm những nội dung nào sau đây?
+a. Tăng cường tuyên truyền giáo dục chính trị
+b. Nâng cao bản lĩnh chính trị, trình độ học vấn chuyên môn
+c. Xây dựng giai cấp công nhân hiện đại, lớn mạnh
+*d. Bao gồm các đáp án
+Câu 122: Vấn đề nổi bật nhất đối với việc thực hiện sứ mệnh lịch sử của giai cấp công nhân Việt Nam hiện nay trong lĩnh vực kinh tế là gì?
+*a. Giai cấp công nhân phát huy vai trò và trách nhiệm của lực lượng đi đầu trong sự nghiệp đẩy mạnh công nghiệp hóa, hiện đại hóa đất nước
+b. Tất cả các đáp án đều đúng
+c. Giữ vững bản chất giai cấp công nhân của Đảng
+d. Giáo dục đạo đức cách mạng, rèn luyện lối sống, tác phong công nghiệp, văn minh, hiện đại
+Câu 123: Khái niệm mới để chỉ giai cấp công nhân theo xu hướng trí tuệ hóa:
+a. Công nhân hiện đại
+*b. Công nhân áo trắng
+c. Công nhân khoáng sản
+d. Công nhân công trường thủ công
+Câu 124: Theo chủ nghĩa Mác-Lênin, biện pháp cơ bản nào là tiền đề thực tiễn tuyệt đối cần thiết để phát triển giai cấp công nhân về số lượng và chất lượng?
+a. Cải cách hành chính
+b. Chuyển đổi cơ cấu kinh tế
+*c. Phát triển công nghiệp
+d. Phát triển nông nghiệp
+Câu 125: Thuật ngữ nào theo nghĩa hẹp C.Mác và Ph.Ăngghen dùng để chỉ các giai cấp công nhân trong các ngành sản xuất khác nhau, trong những giai đoạn phát triển khác nhau của công nghiệp?*
+a. Công nhân hiện đại
+*b. Công nhân khoáng sản
+c. Lực lượng sản xuất hiện đại
+d. Công nhân đại công nghiệp
+Câu 126: Trong cuộc cách mạng về tư tưởng, giai cấp công nhân cần xây dựng và củng cố ý thức hệ tiên tiến của giai cấp mình làm nền tảng tinh thần của xã hội. Ý thức hệ đó là:
+*a. Chủ nghĩa Mác - Lênin
+b. Hệ tư tưởng phong kiến
+c. Chủ nghĩa hiện sinh
+d. Hệ tư tưởng dân chủ tư sản
+Câu 127: “Tính tổ chức và kỷ luật, tự giác và đoàn kết trong cuộc đấu tranh tự giải phóng mình và giải phóng xã hội” đây là những phẩm chất của giai cấp nào?
+a. Đội ngũ trí thức
+b. Giai cấp địa chủ
+*c. Giai cấp công nhân
+d. Giai cấp tư sản
+
+Câu 128: Nguyên nhân cơ bản, sâu xa của đấu tranh giai cấp trong xã hội hiện đại ngày nay:
+a. Xung đột về lợi ích cơ bản giữa giai cấp công nhân và giai cấp nông dân
+*b. Xung đột về lợi ích cơ bản giữa giai cấp tư sản và giai cấp công nhân
+c. Xung đột về lợi ích cơ bản giữa giai cấp tư sản và giai cấp nông dân
+d. Phong trào đấu tranh vì tiến bộ, công bằng, dân sinh vẫn diễn ra
+Câu 129: Nền tảng tư tưởng của Đảng mà giai cấp công nhân Việt Nam đấu tranh bảo vệ là:
+a. Các đáp án đều sai
+b. Chủ nghĩa Mác - Lênin và Cương lĩnh chính trị của Đảng
+*c. Chủ nghĩa Mác - Lênin và Tư tưởng Hồ Chí Minh
+d. Tư tưởng Hồ Chí Minh và Cương lĩnh chính trị của Đảng
+Câu 130: Mục tiêu cao nhất của giai cấp công nhân khi thực hiện sứ mệnh lịch sử của mình là:
+a. Giải phóng lực lượng sản xuất lạc hậu lỗi thời
+b. Giải phóng giai cấp công nhân
+c. Giải phóng tư liệu sản xuất có trình độ thấp
+*d. Giải phóng con người
+
+Câu 131: Chủ nghĩa xã hội có nền kinh tế phát triển cao dựa trên lực lượng sản xuất hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu, đây là đặc trưng về phương diện:
+A. Chính trị
+B. Văn hóa - tinh thần
+*C. Kinh tế
+D. Tư tưởng
+Câu 132: Đại hội XIII của Đảng đã xác định mục tiêu đến giữa thế kỷ XXI, nước ta trở thành nước phát triển theo định hướng xã hội chủ nghĩa với mục tiêu:
+A. Đến năm 2030 trở thành nước phát triển có thu nhập cao
+B. Các đáp án đều đúng
+C. Đến năm 2030, là nước đang phát triển, có công nghiệp hiện đại, thu nhập trung bình thấp
+*D. Đến năm 2025 là nước đang phát triển, có công nghiệp theo hướng hiện đại, vượt qua mức thu nhập trung bình
+Câu 133: Đặc điểm của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực văn hóa - tư tưởng là gì?
+*A. Tồn tại nhiều tư tưởng khác nhau, chủ yếu là tư tưởng vô sản và tư tưởng tư sản
+B. Tồn tại nhiều tàn dư của xã hội cũ
+C. Tư tưởng vô sản và tư tưởng phong kiến là chủ yếu
+D. Tư tưởng tư sản còn ảnh hưởng sâu rộng trong đời sống văn hóa tinh thần
+Câu 134: C. Mác cho rằng giữa xã hội tư bản chủ nghĩa và xã hội cộng sản chủ nghĩa... nhà nước của thời kỳ ấy không thể là cái gì khác hơn là:
+A. Nền chuyên chính cách mạng của giai cấp thống trị tư sản
+*B. Nền chuyên chính cách mạng của giai cấp vô sản
+C. Nền chuyên chính cách mạng xã hội tư bản chủ nghĩa
+D. Các đáp án đều sai
+Câu 135: “Về lý luận, không thể nghi ngờ gì được rằng giữa chủ nghĩa tư bản và chủ nghĩa cộng sản, có một thời kỳ quá độ nhất định” là câu nói của ai?
+*A. V.I. Lênin
+B. Ph. Ăngghen
+C. C. Mác
+D. Hêghen
+Câu 136:* Cương lĩnh xây dựng đất nước trong thời kỳ quá độ lên chủ nghĩa xã hội (1991) đã xác định mô hình chủ nghĩa xã hội ở nước ta với mấy đặc trưng?*
+A. 8 đặc trưng
+B. 7 đặc trưng
+*C. 6 đặc trưng
+D. 5 đặc trưng
+Câu 137: Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa là tạo ra sự biến đổi:
+A. Về lượng của xã hội trên tất cả các lĩnh vực
+B. Về độ của xã hội trên tất cả các lĩnh vực
+C. Về tư tưởng của xã hội
+*D. Về chất của xã hội trên tất cả các lĩnh vực
+Câu 138: Đến Đại hội nào, nhận thức của Đảng ta về chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội đã có bước *phát triển mới, phát triển mô hình chủ nghĩa xã hội Việt Nam với *tám đặc trưng?*
+A. Đại hội VII
+*B. Đại hội XI
+C. Đại hội IV
+D. Đại hội XII
+Câu 139:Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa được hiểu như thế nào?
+A. Bỏ qua tất cả những gì thuộc về chủ nghĩa tư bản
+B. Tiếp thu, kế thừa những thành tựu mà nhân loại đã đạt được dưới chế độ tư bản chủ nghĩa
+*C. Bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa
+D. Tạo ra sự biến đổi về chất của xã hội trên tất cả các lĩnh vực của đời sống
+Câu 140: Vai trò của kinh tế quốc doanh và kinh tế tập thể trong nền kinh tế quốc dân là gì?
+A. Yếu tố hỗ trợ của nền kinh tế quốc dân
+B. Đối lập lợi ích của nền kinh tế quốc dân
+*C. Nền tảng của nền kinh tế quốc dân
+D. Các đáp án đều đúng
+Câu 141: Hai hình thức quá độ từ chủ nghĩa tư bản lên chủ nghĩa cộng sản là:
+*A. Quá độ trực tiếp và quá độ gián tiếp
+B. Quá độ cơ bản và không cơ bản
+C. Quá độ lâu dài và quá độ nhảy vọt
+D. Quá độ khách quan và quá độ chủ quan
+Câu 142: Thời kỳ quá độ trực tiếp từ chủ nghĩa tư bản lên chủ nghĩa cộng sản đối với những nước nào?
+A. Những nước đang trải qua chủ nghĩa tư bản phát triển
+*B. Những nước đã trải qua chủ nghĩa tư bản phát triển
+C. Những nước chậm phát triển
+D. Những nước chưa trải qua chủ nghĩa tư bản phát triển
+Câu 143: Học thuyết hình thái kinh tế - xã hội của chủ nghĩa Mác - Lênin đã chỉ ra tính tất yếu sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế - xã hội cộng sản chủ nghĩa, đó là quá trình:
+*A. Lịch sử, tự nhiên
+B. Tất yếu, tự nhiên
+C. Lịch sử, ngẫu nhiên
+D. Tất yếu, tất nhiên
+Câu 144: Theo C. Mác và Ph. Ăngghen: “Sự phát triển tự do của mỗi người là điều kiện cho sự phát triển tự do của tất cả mọi người” là mục tiêu tổng quát của lịch sử mà xã hội nào sẽ đạt tới?
+A. Chế độ xã hội chủ nghĩa
+B. Chủ nghĩa tư bản
+C. Chế độ xã hội mới
+*D. Xã hội cộng sản chủ nghĩa
+Câu 145: Theo quan điểm của chủ nghĩa Mác - Lênin, sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế - xã hội cộng sản chủ nghĩa được thực hiện bằng cách nào?
+A. Thông qua cải cách xã hội
+*B. Thông qua cách mạng xã hội chủ nghĩa
+C. Thông qua cách mạng tư sản
+D. Thông qua thời kỳ quá độ
+Câu 146: Những điều kiện chủ yếu ra đời của chủ nghĩa xã hội:
+*A. Điều kiện kinh tế và điều kiện chính trị - xã hội
+B. Điều kiện kinh tế và điều kiện tư tưởng xã hội
+C. Điều kiện mâu thuẫn xã hội sâu sắc
+D. Điều kiện chính trị - xã hội và điều kiện tư tưởng
+Câu 147: Những tiền đề vật chất quan trọng nhất cho sự ra đời của chủ nghĩa xã hội là gì?
+*A. Sự phát triển của lực lượng sản xuất và sự trưởng thành của giai cấp công nhân
+B. Sản xuất vật chất phát triển tạo ra một lượng hàng hóa khổng lồ
+C. Sự lớn mạnh của giai cấp vô sản và sự phát triển của quan hệ sản xuất tư bản chủ nghĩa
+D. Giai cấp công nhân trưởng thành và trở thành một lực lượng chính trị độc lập
+Câu 148: Đặc điểm quá độ lên chủ nghĩa xã hội ở Việt Nam là:
+A. Bỏ qua chế độ phong kiến
+*B. Bỏ qua chế độ tư bản chủ nghĩa
+C. Các đáp án đều đúng
+D. Bỏ qua thời kỳ cách mạng cải tạo xã hội cũ
+Câu 149: Nhận thức của Đảng Cộng sản Việt Nam và nhân dân Việt Nam về chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ngày càng sáng rõ hơn vào thời điểm:*
+A. Đại hội VII
+B. Đại hội XII
+C. Đại hội IV (1976)
+D. Đại hội XI.
+Câu 150: Trong các đặc trưng của chủ nghĩa xã hội, đặc trưng nào thể hiện thuộc tính bản chất của chủ nghĩa xã hội?
+A. Là xã hội do nhân dân lao động làm chủ
+B. Có nhà nước mang bản chất của giai cấp công nhân, đại biểu cho lợi ích, quyền lực và ý chí của nhân dân lao động
+*C. Chủ nghĩa xã hội giải phóng giai cấp, giải phóng dân tộc, giải phóng xã hội, giải phóng con người, tạo điều kiện để con người phát triển toàn diện
+D. Có nền kinh tế phát triển cao dựa trên lực lượng hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu
+Câu 151: Đặc trưng cơ bản nào của chủ nghĩa xã hội đang xây dựng ở Việt Nam thể hiện mục tiêu của xã hội xã hội chủ nghĩa?
+A. Do nhân dân lao động làm chủ
+B. Có nhà nước pháp quyền xã hội chủ nghĩa
+*C. Dân giàu, nước mạnh, dân chủ, công bằng, văn minh
+D. Có nền văn hóa tiên tiến, đậm đà bản sắc dân tộc
+Câu 152: Các nhà sáng lập chủ nghĩa Mác - Lênin đánh giá thời kỳ quá độ ở những nước chưa trải qua chủ nghĩa tư bản phát triển như thế nào?
+A. Những cuộc đấu tranh đẫm máu
+B. Những cơn đau khổ kéo dài
+C. Những quá trình cải tạo chồng chéo
+*D. Những cơn đau đẻ kéo dài
+Câu 153: Đặc trưng thể hiện thuộc tính bản chất của chủ nghĩa xã hội:
+A. Chủ nghĩa xã hội bảo đảm bình đẳng, đoàn kết giữa các dân tộc
+B. Chủ nghĩa xã hội có nền văn hóa phát triển cao
+*C. Chủ nghĩa xã hội là chế độ do nhân dân lao động làm chủ
+D. Chủ nghĩa xã hội có nền kinh tế phát triển cao dựa trên lực lượng sản xuất hiện đại
+Câu 154: Đại hội XIII của Đảng đã xác định mục tiêu đến giữa thế kỷ XXI, nước ta trở thành nước phát triển theo định hướng xã hội chủ nghĩa với các mục tiêu cụ thể: Đến năm 2030, kỷ niệm 100 năm thành lập Đảng:
+A. Thu nhập trung bình cao
+B. Là nước đang phát triển
+C. Có công nghiệp hiện đại
+*D. Các đáp án đều đúng
+Câu 155: Thực chất của thời kỳ quá độ lên chủ nghĩa xã hội là gì?
+A. Sắp xếp, bố trí lại các lực lượng sản xuất hiện có
+B. Xây dựng quan hệ sản xuất mới theo hướng tạo ra sự phát triển cân đối của nền kinh tế, bảo đảm phục vụ ngày càng tốt hơn đời sống nhân dân lao động
+C. Cải tạo quan hệ xã hội cũ
+*D. Thời kỳ cải biến cách mạng từ xã hội tiền tư bản chủ nghĩa và tư bản chủ nghĩa sang xã hội xã hội chủ nghĩa
+Câu 156: Cách mạng vô sản là cuộc cách mạng của giai cấp công nhân và nhân dân lao động dưới sự lãnh đạo của Đảng Cộng sản trên thực tế được thực hiện bằng con đường:
+*A. Con đường bạo lực cách mạng
+B. Con đường bầu cử chính trị công khai
+C. Con đường đấu tranh bất bạo động
+D. Con đường thỏa hiệp xây dựng xã hội
+Câu 157: Sự trưởng thành vượt bậc của giai cấp công nhân được đánh dấu bằng:
+A. Sự chuyển hướng đấu tranh cách mạng sang tự phát
+B. Các đáp án đều đúng
+C. Sự xuất hiện của phong trào công nhân
+*D. Sự ra đời của Đảng Cộng sản
+Câu 158: Điền vào chỗ trống: “Xã hội xã hội chủ nghĩa mà nhân dân ta xây dựng là một xã hội dân giàu, nước mạnh, ….”
+*A. Dân chủ, công bằng, văn minh
+B. Văn minh, dân chủ, công bằng
+C. Công bằng, văn minh, dân chủ
+D. Công bằng, dân chủ, văn minh
+Câu 159: Về kỹ năng, sau khi học xong lý luận về chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội, sinh viên cần đạt được điều gì?
+A. Khẳng định niềm tin vào chủ nghĩa xã hội
+*B. Bước đầu biết vận dụng những tri thức có được vào phân tích những vấn đề cơ bản của chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ở Việt Nam hiện nay
+C. Quan điểm của chủ nghĩa Mác-Lênin về chủ nghĩa xã hội và sự vận dụng sáng tạo của Đảng cộng sản
+D. Tin tưởng, ủng hộ sự lãnh đạo của Đảng cộng sản Việt Nam
+Câu 160: Đặc điểm cơ bản của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực xã hội là gì?
+A. Đấu tranh làm thất bại mọi âm mưu và hành động chống phá của các thế lực thù địch, bảo vệ độc lập dân tộc
+B. Thực hiện thắng lợi sự nghiệp công nghiệp hóa, hiện đại hóa theo định hướng xã hội chủ nghĩa
+C. Đấu tranh ngăn chặn và khắc phục những tư tưởng và hành động sai trái
+*D. Là thời kỳ đấu tranh giai cấp chống áp bức bất công, xóa bỏ tệ nạn xã hội và những tàn dư của xã hội cũ để lại, thiết lập công bằng xã hội trên cơ sở thực hiện nguyên tắc phân phối theo lao động là chủ đạo
+Câu 161:Theo Chủ nghĩa Mác- Lênin, nền dân chủ mới mà giai cấp công nhân và nhân dân lao động đang hướng tới nội dung nào?
+*a. Dân chủ xã hội chủ nghĩa
+b. Dân chủ tư sản
+c. Dân chủ đại diện
+d. Dân chủ hình thức
+Câu 162: Dân chủ xã hội chủ nghĩa là bản chất của chế độ ta, vừa là mục tiêu, vừa là động lực của sự phát triển đất nước” Nhận định trên của ai?
+a. V.I.Lênin
+*b. Đảng cộng sản Việt Nam
+c. Chủ tịch Hồ Chí Minh
+d. Các Mác
+Câu 163: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam có sự khác biệt cơ bản nào đối với các nhà nước pháp quyền khác?
+a. Mang bản chất của tầng lớp trí thức
+b. Mang bản chất của giai cấp tiểu tư sản
+*c. Mang bản chất của giai cấp công nhân
+d. Mang bản chất giai cấp nông dân
+Câu 164: Yếu tố đảm bảo xây dựng nền dân chủ xã hội chủ nghĩa ở nước ta là:
+a. Xây dựng đội ngũ cán bộ, công chức trong sạch, có năng lực
+*b. Tăng cường công tác giám sát, phản biện xã hội
+c. Cải cách thể chế và phương thức hoạt động của Nhà nước
+d. Đấu tranh phòng chống tham nhũng, lãng phí
+Câu 165: Nhiệm vụ cấp bách, lâu dài của quá trình xây dựng Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam:
+a. Xây dựng và hoàn thiện thể chế kinh tế thị trường
+b. Cải cách thể chế và phương thức hoạt động của Nhà nước
+*c. Phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Xây dựng Nhà nước pháp quyền xã hội chủ nghĩa dưới sự lãnh đạo của Đảng
+Câu 166: Trong quá trình xây dựng và hoàn thiện Nhà nước pháp quyền xã hội chủ nghĩa, việc đẩy mạnh cải cách hành chính, giảm mạnh và bãi bỏ các thủ tục hành chính gây phiền hà cho tổ chức và công dân thuộc nội dung:
+a. Đấu tranh phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+b. Xây dựng đội ngũ cán bộ, công chức trong sạch, có năng lực
+c. Xây dựng, hoàn thiện thể chế kinh tế thi trường
+*d. Cải cách thể chế và phương thức hoạt động của Nhà nước
+Câu 167: Đại hội XIII của Đảng nhấn mạnh: "Quyền lực nhà nước là thống nhất, có sự phân công rành mạch, phối hợp chặt chẽ và tăng cường kiểm soát quyền lực ...."
+a. Đảng Cộng sản
+b. Nhân dân
+*c. Nhà nước
+d. Mặt trận Tổ quốc
+Câu 168: Đề cao vai trò tối thượng của Hiến pháp và pháp luật; đề cao quyền lợi và nghĩa vụ của công dân, bảo đảm quyền con người là nội dung được nêu ra trong văn kiện nào của Đảng cộng sản Việt Nam?
+*a. Cương lĩnh xây dựng đất nước trong thời kỳ quá độ lên chủ nghĩa xã hội
+b. Công cuộc đổi mới đất nước theo định hướng xã hội chủ nghĩa
+c. Tiến trình phát triển của công cuộc đổi mới đất nước
+d. Những nhiệm vụ trọng tâm của thời kỳ quá độ lên Chủ nghĩa xã hội
+Câu 169: Nhà nước Pháp quyền xã hội chủ nghĩa đặt dưới sự lãnh đạo của:
+*a. Đảng Cộng sản Việt Nam
+b. Chính phủ
+c. Quốc Hội
+d. Mặt trận Tổ Quốc
+Câu 170: Theo Hiến pháp 2013, hoạt động của Nhà nước được giám sát bởi nhân dân với phương châm gì?
+a. Nhà nước lắng nghe ý kiến của nhân dân và chịu sự kiểm soát của nhân dân
+b. Nhà nước phải được hoàn thiện bằng việc ban hành các cơ chế và biện pháp kiểm soát, ngăn ngừa các hiện tượng tiêu cực…
+c. Nhà nước phục vụ nhân dân, gắn bó mật thiết với nhân dân, thực hiện đầy đủ các quyền làm chủ của nhân dân
+*d. Dân biết, dân bàn, dân kiểm tra thông qua các tổ chức, các cá nhân được nhân dân ủy nhiệm
+Câu 171: Khi coi dân chủ là một giá trị xã hội mang tính toàn nhân loại, Chủ tịch Hồ Chí Minh đã khẳng định quan điểm nào?
+*a. Dân chủ là dân là chủ, dân làm chủ
+b. Dân chủ là dân làm chủ, dân là chủ
+c. Dân chủ là dân làm chủ
+d. Dân chủ là dân là chủ
+Câu 172: Điều kiện tiên quyết để phát huy dân chủ xã hội chủ nghĩa và xây dựng nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam:
+a. Xây dựng, hoàn thiện thể chế kinh tế thị trường
+*b. Xây dựng Đảng Cộng sản Việt Nam trong sạch vững mạnh
+c. Củng cố khối liên minh công nông
+d. Các đáp án đều đúng
+Câu 173: Nền dân chủ xã hội chủ nghĩa mang bản chất của giai cấp nào?
+*a. Giai cấp công nhân
+b. Quần chúng nhân dân
+c. Giai cấp nông dân
+d. Tầng lớp trí thức
+Câu 174: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam mang bản chất của giai cấp nào?
+a. Giai cấp tư sản
+b. Giai cấp nông dân
+c. Đội ngũ trí thức
+*d. Giai cấp công nhân
+Câu 175: Điền vào chỗ trống: “Nhà nước pháp quyền xã hội chủ nghĩa ở nước ta đặt dưới sự lãnh đạo của Đảng Cộng sản Việt Nam, phải thực thi quyền … của nhân dân trên tất cả lĩnh vực của đời sống xã hội, thể hiện bằng Hiến pháp và pháp luật.”
+a. Kinh doanh
+b. Bình đẳng
+c. Tự do
+*d. Dân chủ
+Câu 176: Bản chất chính trị của nền dân chủ xã hội chủ nghĩa là gì?
+a. Là nền dân chủ của giai cấp công nhân thông qua chính đảng của nó để cải tạo xã hội cũ và xây dựng xã hội mới
+b. Là nền dân chủ của giai cấp công nhân và nhân dân lao động thực hiện quyền lực đối với toàn xã hội
+c. Là nền dân chủ phi giai cấp
+*d. Là nền dân chủ có tính nhân dân rộng rãi và tính dân tộc sâu sắc
+Câu 177: Cơ quan quyền lực cao nhất ở nước ta là:
+a. Đảng Cộng sản
+b. Nhà nước pháp quyền
+*c. Quốc hội
+d. Chính phủ
+Câu 178: Bản chất xã hội của dân chủ xã hội chủ nghĩa được thể hiện như thế nào?
+a. Hình thành và phát triển dưới sự lãnh đạo của Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+*b. Là sự kết hợp hài hòa về lợi ích giữa cá nhân, tập thể và lợi ích toàn xã hội
+c. Hình thành và phát triển một cách tự giác, đặt dưới sự lãnh đạo của giai cấp công nhân thông qua tổ chức Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+d. Luôn có sự kế thừa trong bất cứ thời kỳ nào của lịch sử
+Câu 179: Sự ra đời của nền dân chủ xã hội chủ nghĩa đánh dấu bước phát triển mới về điều gì?
+a. Nội dung của dân chủ
+*b. Chất của dân chủ
+c. Gía trị của dân chủ
+d. Lượng của dân chủ
+Câu 180: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam mang bản chất của giai cấp nào?
+a. Giai cấp nông dân
+b. Đội ngũ trí thức
+*c. Giai cấp công nhân
+d. Giai cấp tư sản
+Câu 181: Dân chủ xã hội chủ nghĩa có mối quan hệ như thế nào với việc xây dựng và hoạt động của nhà nước xã hội chủ nghĩa?
+a. Là cơ sở, động lực
+b. Là cơ sở, điều kiện
+*c. Là cơ sở, nền tảng
+d. Là cơ sở, cách thức
+Câu 182: Bản chất chính trị của Nhà nước xã hội chủ nghĩa được biểu hiện bản chất của giai cấp, tầng lớp nào?
+*a. Giai cấp công nhân
+b. Giai cấp nông dân
+c. Tầng lớp trí thức
+d. Nhân dân lao động
+Câu 183: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam phải đảm bảo quyền gì của nhân dân?
+a. Quyền sở hữu tư nhân là quyền cao nhất
+b. Quyền tự do ngôn luận không bị kiểm soát
+*c. Quyền con người là cao nhất
+d. Quyền kinh doanh không giới hạn
+Câu 184: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam hoạt động được giám sát bởi nhân dân theo phương châm:
+a. Dân kiểm tra, dân bàn, dân biết, dân làm
+b. Dân bàn, dân biết, dân kiểm tra, dân làm
+*c. Dân biết, dân bàn, dân làm, dân kiểm tra
+d. Dân làm, dân bàn, dân biết, dân kiểm tra
+Câu 185: Nhà nước xã hội chủ nghĩa trở thành công cụ quan trọng trong việc thực thi quyền cơ bản gì của nhân dân?
+a. Quyền làm chủ chính trị của nhân dân
+b. Quyền làm chủ kinh tế của nhân dân
+c. Quyền làm chủ văn hóa của nhân dân
+*d. Quyền làm chủ của nhân dân
+Câu 186: Cơ quan quyền lực cao nhất ở nước ta là:
+*a. Quốc hội
+b. Chính phủ
+c. Đảng Cộng sản
+d. Nhà nước pháp quyền
+Câu 187: Căn cứ vào phạm vi tác động của quyền lực nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng đối nội, chức năng chính trị
+*b. Chức năng đối nội, chức năng đối ngoại
+c. Chức năng giai cấp, chức năng xã hội
+d. Chức năng kinh tế, chức năng chính trị
+Câu 188: Bản chất văn hóa – xã hội của Nhà nước xã hội chủ nghĩa được xây dựng trên nền tảng tinh thần nào?
+a. Là nhà nước dân chủ và pháp quyền
+**b. Lý luận của Chủ nghĩa Mác- Lênin và những giá trị văn hóa tiên tiến của nhân loại đồng thời mang những bản sắc riêng của dân tộc.
+c. Nhân dân là chủ thể tối cao của quyền lực nhà nước
+d. Là biểu hiện tập trung của khối đại đoàn kết toàn dân tộc
+Câu 189: Quan niệm của chủ nghĩa Mác Lênin về dân chủ được thể hiện trong những lĩnh vực nào?
+a. Kinh tế, xã hội, tư tưởng
+*b. Chính trị, kinh tế, văn hóa, xã hội
+c. Kinh tế, chính trị, văn hóa, tư tưởng
+d. Kinh tế, chính trị, tư tưởng
+Câu 190: Để đảm bảo dân chủ, dân chủ phải gắn liền với kỷ cương và phải được thể chế hóa bằng gì?
+a. Mệnh lệnh hành chính
+b. Chính sách kinh tế
+c. Nghị quyết của Đảng
+*d. Pháp luật
+Câu 191: Căn cứ vào tính chất và quyền lực của nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng kinh tế, chức năng chính trị
+*b. Chức năng giai cấp, chức năng xã hội
+c. Chức năng đối nội, chức năng đối ngoại
+d. Chức năng đối nội, chức năng chính trị
+Câu 192: “Nước ta là nước dân chủ. Bao nhiêu lợi ích đều vì dân. Bao nhiêu quyền hạn đều là của dân... Nói tóm lại, quyền hành và lực lượng đều ở dân”. Nhận định trên của ai?
+a. Lê Duẩn
+b. Trường Chinh
+c. Phạm Văn Đồng
+*d. Hồ Chí Minh
+Câu 193: Đảng Cộng sản Việt Nam khẳng định đặc trưng bản chất của chủ nghĩa xã hội Việt Nam là:
+*a. Do nhân dân làm chủ
+b. Do tầng lớp trí thức làm chủ
+c. Do giai cấp nông dân làm chủ
+d. Do giai cấp công nhân làm chủ
+Câu 194: Một trong những nội dung trong việc tiếp tục xây dựng và hoàn thiện Nhà nước pháp quyền xã hội chủ nghĩa:
+a. Xây dựng và từng bước hoàn thiện các hệ thống giám sát, phản biện xã hội
+b. Nâng cao vai trò của các tổ chức chính trị - xã hội
+*c. Đấu tranh phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Xây dựng, hoàn thiện thể chế kinh tế thị trường định hướng xã hội chủ nghĩa
+Câu 195: “Nước ta là nước dân chủ. Bao nhiêu lợi ích đều vì dân. Bao nhiêu quyền hạn đều là của dân.. Nói tóm lại, quyền hành và lực lượng đều ở dân”. Nhận định trên của ai?
+a. Lê Duẩn
+*b. Hồ Chí Minh
+c. Phạm Văn Đồng
+d. Trường Chinh
+Câu 196: Yếu tố nào sau đây là điều kiện thực thi dân chủ xã hội chủ nghĩa:
+a. Xây dựng Đảng Cộng sản Việt Nam trong sạch, vững mạnh
+*b. Xây dựng nhà nước pháp quyền xã hội chủ nghĩa vững mạnh
+c. Nâng cao vai trò của các tổ chức chính trị - xã hội
+d. Xây dựng, hoàn thiện thể chế kinh tế thi trường
+Câu 197: Bản chất kinh tế của Nhà nước xã hội chủ nghĩa thể hiện ở quan hệ sản xuất gì?
+a. Quan hệ sản xuất cá thể về tư liệu sản xuất
+b. Quan hệ sản xuất tư nhân về tư liệu sản xuất
+c. Quan hệ sản xuất tàn dư về tư liệu sản xuất
+*d. Quan hệ sản xuất công hữu về tư liệu sản xuất
+Câu 198: Thách thức lớn nhất trong việc xây dựng nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam hiện nay là:
+*a. Tham nhũng, lãng phí
+b. Sự bất bình đẳng về thu nhập
+c. Ý thức pháp luật của công dân
+d. Tệ nạn xã hội
+Câu 199: Để xây dựng, hoàn thiện thể chế kinh tế thị trường định hướng xã hội chủ nghĩa tạo ra cơ sở kinh tế vững chắc cho xây dựng dân chủ xã hội chủ nghĩa cần phải:
+a. Phát triển đồng bộ các yếu tố thị trường và các loại thị trường
+b. Nhận thức đúng đắn về vai trò quan trọng của thể chế, xây dựng hoàn thiện thể chế
+c. Phát triển đa dạng các hình thức sở hữu, thành phần kinh tế, loại hình doanh nghiệp
+*d. Bao gồm các đáp án
+Câu 200: Một trong những nội dung tiếp tục xây dựng và hoàn thiện nhà nước pháp quyền xã hội chủ nghĩa ở nước ta hiện nay là gì?
+*a. Đấu tranh phòng chống tham nhũng, lãng phí, thực hành tiết kiệm
+b. Xây dựng các tổ chức nhà nước vững mạnh
+c. Nâng cao vai trò quản lý của các tổ chức nhà nước
+d. Hoàn thiện các hệ thống giám sát, phản biện xã hội.
+</textarea>
+            
+            <button onclick="parseAndProceed()" class="w-full py-4 rounded-xl font-cyber text-xl font-bold uppercase tracking-widest transition-all duration-300 bg-[#0ff] text-black hover:bg-white hover:shadow-[0_0_30px_#fff]">
+                Nạp Dữ Liệu & Tiếp Tục
+            </button>
+            <p id="import-error" class="text-red-500 mt-3 text-center text-sm font-medium hidden uppercase tracking-wider"></p>
+        </div>
+    </div>
+
+    <!-- Màn hình 2: Cấu hình (Start Screen) -->
+    <div id="screen-setup" class="flex-grow flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto absolute inset-0 z-10 hidden opacity-0 transition-opacity duration-500">
+        <div class="text-center mb-12 fade-up delay-1">
+            <h1 class="text-5xl md:text-7xl font-cyber font-black neon-text mb-4 tracking-wider uppercase">Hero Quiz</h1>
+            <p class="text-gray-400 text-lg tracking-widest uppercase">Hệ Thống Đã Nạp: <span id="total-loaded" class="text-[#0f0] font-bold">0</span> Câu Hỏi</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl mb-12 fade-up delay-2">
+            <button onclick="selectMode(30)" id="btn-mode-30" class="mode-btn neon-box p-6 rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer">
+                <i class="fas fa-bolt text-3xl text-[#0ff]"></i>
+                <span class="font-cyber text-2xl font-bold">30 CÂU</span>
+            </button>
+            <button onclick="selectMode(50)" id="btn-mode-50" class="mode-btn neon-box p-6 rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer">
+                <i class="fas fa-fire text-3xl text-[#0ff]"></i>
+                <span class="font-cyber text-2xl font-bold">50 CÂU</span>
+            </button>
+            <button onclick="selectMode('ALL')" id="btn-mode-all" class="mode-btn neon-box p-6 rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer">
+                <i class="fas fa-infinity text-3xl text-[#0ff]"></i>
+                <span class="font-cyber text-2xl font-bold">TẤT CẢ</span>
+            </button>
+        </div>
+
+        <div class="fade-up delay-3 w-full max-w-sm">
+            <button onclick="startQuiz()" id="btn-start" disabled class="w-full py-4 rounded-xl font-cyber text-xl font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed bg-transparent border-2 border-[#0ff] text-[#0ff] hover:bg-[#0ff] hover:text-black hover:shadow-[0_0_30px_#0ff]">
+                Bắt Đầu
+            </button>
+        </div>
+    </div>
+
+    <!-- Màn hình 3: Quiz -->
+    <div id="screen-quiz" class="flex-grow flex flex-col items-center p-6 w-full max-w-5xl mx-auto absolute inset-0 z-10 hidden opacity-0 transition-opacity duration-500 overflow-y-auto">
+        <div class="w-full flex justify-between items-center mb-6 mt-12 px-4 fade-up">
+            <div class="font-cyber text-xl">
+                <span class="text-gray-400">CÂU</span> 
+                <span id="ui-current-q" class="neon-text text-3xl font-bold ml-2">1</span>
+                <span class="text-gray-500 text-lg">/<span id="ui-total-q">30</span></span>
+            </div>
+            <div class="font-cyber text-xl">
+                <span class="text-gray-400">ĐIỂM</span>
+                <span id="ui-score" class="text-[#0f0] text-3xl font-bold ml-2 drop-shadow-[0_0_8px_#0f0]">0</span>
+            </div>
+        </div>
+
+        <div class="quiz-grid w-full pb-10">
+            <div id="box-q" class="q-box neon-box rounded-2xl p-8 flex items-center justify-center text-center fade-up delay-1 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0ff] to-transparent opacity-50"></div>
+                <h2 id="text-question" class="text-xl md:text-2xl font-semibold leading-relaxed tracking-wide"></h2>
+            </div>
+          
+            <!-- Options (Chữ A,B,C,D cố định ở UI, nội dung động) -->
+            <button id="opt-0" onclick="checkAnswer(0, this)" class="neon-box rounded-xl p-6 text-left font-medium text-lg fade-up delay-2 hover:bg-[#0ff] hover:bg-opacity-10 group">
+                <span class="font-cyber text-[#0ff] mr-3 opacity-70 group-hover:opacity-100">A.</span>
+                <span id="text-opt-0"></span>
+            </button>
+            <button id="opt-1" onclick="checkAnswer(1, this)" class="neon-box rounded-xl p-6 text-left font-medium text-lg fade-up delay-3 hover:bg-[#0ff] hover:bg-opacity-10 group">
+                <span class="font-cyber text-[#0ff] mr-3 opacity-70 group-hover:opacity-100">B.</span>
+                <span id="text-opt-1"></span>
+            </button>
+            <button id="opt-2" onclick="checkAnswer(2, this)" class="neon-box rounded-xl p-6 text-left font-medium text-lg fade-up delay-4 hover:bg-[#0ff] hover:bg-opacity-10 group">
+                <span class="font-cyber text-[#0ff] mr-3 opacity-70 group-hover:opacity-100">C.</span>
+                <span id="text-opt-2"></span>
+            </button>
+            <button id="opt-3" onclick="checkAnswer(3, this)" class="neon-box rounded-xl p-6 text-left font-medium text-lg fade-up delay-5 hover:bg-[#0ff] hover:bg-opacity-10 group">
+                <span class="font-cyber text-[#0ff] mr-3 opacity-70 group-hover:opacity-100">D.</span>
+                <span id="text-opt-3"></span>
+            </button>
+<div class="w-full flex justify-center mt-6 fade-up delay-5">
+    <button onclick="skipQuestion()" class="px-8 py-3 rounded-xl font-cyber text-lg uppercase tracking-widest transition-all duration-300 border border-gray-500 text-gray-400 hover:text-[#0ff] hover:border-[#0ff] hover:bg-[#0ff] hover:bg-opacity-10">
+        Bỏ qua câu này
+    </button>
+</div>
+        </div>
+    </div>
+
+    <!-- Màn hình 4: Kết Quả -->
+    <div id="screen-result" class="flex-grow flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto absolute inset-0 z-10 hidden opacity-0 transition-opacity duration-500">
+        <div class="neon-box rounded-3xl p-12 text-center w-full max-w-2xl relative overflow-hidden fade-up">
+            <div class="absolute inset-0 bg-gradient-to-b from-[#0ff]/10 to-transparent pointer-events-none"></div>
+            
+            <i class="fas fa-trophy text-6xl text-[#0f0] mb-6 drop-shadow-[0_0_20px_#0f0]"></i>
+            <h2 class="font-cyber text-4xl font-bold uppercase mb-2 neon-text">Hoàn Thành Nhiệm Vụ</h2>
+            <p class="text-gray-400 mb-10"> Bài kiểm tra này được Hero Duy sáng tạo ra, cảm ơn bạn đã quan tâm .</p>
+
+            <div class="flex justify-center items-center gap-8 mb-12">
+                <div>
+                    <p class="font-cyber text-sm text-gray-500 uppercase tracking-widest mb-2">ĐIỂM SỐ</p>
+                    <p class="text-5xl font-black text-[#0f0] drop-shadow-[0_0_15px_#0f0]"><span id="res-score">0</span><span class="text-2xl text-gray-400">/<span id="res-total">0</span></span></p>
+                </div>
+                <div class="h-16 w-px bg-gray-700"></div>
+                <div>
+                    <p class="font-cyber text-sm text-gray-500 uppercase tracking-widest mb-2">TỶ LỆ</p>
+                    <p id="res-percent" class="text-5xl font-black text-[#0ff] drop-shadow-[0_0_15px_#0ff]">0%</p>
+                </div>
+            </div>
+
+            <button onclick="resetApp()" class="px-10 py-4 rounded-xl font-cyber text-lg font-bold uppercase tracking-widest transition-all duration-300 bg-[#0ff] text-black hover:bg-white hover:shadow-[0_0_30px_#fff]">
+                <i class="fas fa-redo mr-2"></i> Khởi Động Lại
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let database = [];
+        let selectedCount = 0;
+        let activeQuizList = [];
+        let currentIndex = 0;
+        let currentScore = 0;
+        let isCurrentQuestionFailed = false;
+        let isTransitioning = false;
+const myPreloadedData = `
+
+Câu 1: Trên cơ sở những nghiên cứu, phân tích về chủ nghĩa đế quốc, V.I.Lênin phát hiện ra quy luật gì?
+a. Quy luật thống nhất và đấu tranh của các mặt đối lập
+*b. Quy luật phát triển không đều về kinh tế và chính trị của chủ nghĩa tư bản trong thời kỳ chủ nghĩa đế quốc
+c. Cả ba đáp án đều đúng
+d. Quy luật về sự phù hợp của quan hệ sản xuất với tính chất và trình độ của lực lượng sản xuất
+
+Câu 2: V.I.Lênin đã nhận xét: "Chủ nghĩa xã hội không tưởng không thể vạch ra được lối thoát thực sự" trong tác phẩm nào?
+*a. Ba nguồn gốc và ba bộ phận cấu thành của chủ nghĩa Mác
+b. Tuyên ngôn của Đảng Cộng sản
+c. Luận cương tháng Tư
+d. Chống Đuyrinh
+
+Câu 3: Phát kiến vĩ đại nào của C.Mác và Ph.Ăngghen là sự khẳng định về phương diện kinh tế sự diệt vong không tránh khỏi của chủ nghĩa tư bản và sự ra đời tất yếu của chủ nghĩa xã hội?
+a. Chủ nghĩa duy vật lịch sử
+b. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+c. Tuyên ngôn của Đảng Cộng sản
+*d. Học thuyết về giá trị thặng dư
+
+Câu 4: Tác phẩm nào của Ph.Ăngghen thể hiện việc ông chuyển từ thế giới quan duy tâm sang thế giới quan duy vật, từ lập trường dân chủ cách mạng sang lập trường cộng sản chủ nghĩa?
+a. Làm gì?
+b. Chống Đuyrinh
+*c. Tình cảnh nước Anh; Lược thảo khoa học kinh tế - chính trị
+d. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu
+
+Câu 5: Chủ nghĩa xã hội khoa học được hiểu theo nghĩa rộng là:
+a. Một trong ba bộ phận hợp thành chủ nghĩa Mác - Lênin
+b. Chủ nghĩa xã hội không tưởng phê phán
+*c. Chủ nghĩa Mác - Lênin
+d. Hệ tư tưởng của giai cấp nông dân
+
+
+
+Câu 6: Mô hình của chế độ xã hội chủ nghĩa ở Liên Xô và Đông Âu sụp đổ vào năm nào?
+*a. 1991
+b. 1990
+c. 1981
+d. 1980
+
+Câu 7: Phong trào đấu tranh của giai cấp công nhân Lion *mang mục đích chính trị bằng khẩu hiệu nào?*
+a. Cộng hòa hay là chết
+b. Độc lập hay là chết
+c. Sống có việc làm hay là chết trong đấu tranh
+d. Chết trong tự do
+
+Câu 8: Đánh giá về chủ nghĩa Mác, V.I.Lênin chỉ rõ: Học thuyết của Mác là một học thuyết .... vì nó là một học thuyết chính xác". Hãy điền vào chỗ trống
+a. Toàn vẹn
+*b. Vạn năng
+c. Nhất thành bất biến
+d. Vạn vật
+
+Câu 9: Chủ nghĩa xã hội khoa học sử dụng phương pháp luận chung nhất gì?
+a. Phương pháp so sánh
+b. Phương pháp kết hợp lịch sử với lôgíc
+*c. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử của triết học Mác - Lênin
+d. Phương pháp khảo sát và phân tích về mặt chính trị- xã hội
+
+Câu 10: Người có công lao xây dựng chủ nghĩa xã hội hiện thực là:
+a. Ph.Ăngghen
+b. C.Mác
+*c. V.I.Lênin
+d. J.Xtalin
+
+Câu 11: Cách mạng vô sản trên thực tế được thực hiện bằng con đường nào?
+*a. Bạo lực cách mạng
+b. Con đường chính trị
+c. Con đường hòa bình
+d. Con đường thỏa hiệp
+
+Câu 12: Các Mác và Ph. Ăngghen đã sử dụng thuật ngữ nào để nói về giai cấp công nhân?
+a. Giai cấp vô sản
+*b. Tất cả các đáp án
+c. Giai cấp công nhân hiện đại
+d. Giai cấp vô sản hiện đại
+
+Câu 13: Trong cuộc cách mạng về tư tưởng, giai cấp công nhân cần xây dựng và củng cố ý thức hệ tiên tiến của giai cấp mình làm nền tảng tinh thần của xã hội. Ý thức hệ đó là:
+a. Chủ nghĩa hiện sinh
+b. Hệ tư tưởng phong kiến
+c. Hệ tư tưởng dân chủ tư sản
+*d. Chủ nghĩa Mác - Lênin
+
+Câu 14: Đối diện với quan hệ sản xuất tư bản chủ nghĩa, giai cấp công nhân có đặc trưng cơ bản:
+a. Đại diện cho quan hệ sản xuất tư bản chủ nghĩa
+b. Giai cấp bị mất hết đất đai và nghèo khổ nhất
+*c. Giai cấp công nhân làm thuê hiện đại, vì mất các tư liệu sản xuất của bản thân, nên buộc phải bán sức lao động của mình để kiếm sống
+d. Chủ sở hữu tư liệu sản xuất
+
+Câu 15: Nội dung kinh tế của sứ mệnh lịch sử giai cấp công nhân:
+a. Phấn đấu cho lợi ích của riêng giai cấp mình
+b. Lợi ích chung và riêng thống nhất
+*c. Đại biểu cho lợi ích chung của xã hội
+d. Phấn đấu cho lợi ích riêng của giai cấp khác
+
+Câu 16: Nhân tố chủ quan, quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử của mình:
+a. Có sự phát triển của bản thân giai cấp công nhân
+*b. Có sự lãnh đạo của Đảng cộng sản
+c. Có sự liên minh giữa giai cấp công nhân với quần chúng nhân dân
+d. Có sự liên minh công- nông
+
+Câu 17: Giai cấp công nhân với phương thức lao động công nghiệp trong nền sản xuất tư bản chủ nghĩa, được hiểu là:
+a. Giai cấp nghèo khổ nhất, có trình độ xã hội thấp
+b. Giai cấp có số lượng đông nhất trong dân cư và trình độ xã hội hóa cao
+c. Giai cấp làm giàu cho xã hội trong thời công nghiệp hiện đại
+*d. Những người lao động trực tiếp hay gián tiếp vận hành những công cụ sản xuất có tính chất công nghiệp ngày càng hiện đại, có trình độ xã hội hóa cao
+
+Câu 18: Vì sao giai cấp công nhân Việt Nam sớm trở thành lực lượng chính trị độc lập?
+a. Kế thừa truyền thống kiên cường bất khuất và yêu nước của dân tộc
+b. Có liên hệ mật thiết với giai cấp nông dân
+c. Kiên định trong giải quyết vấn đề dân tộc trong thời đại mới
+*d. Vì sớm hình thành một chính đảng thực sự cách mạng
+
+Câu 19: Một trong những điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân:
+a. Sự tăng nhanh về số lượng và chất lượng của giai cấp công nhân
+b. Sự phát triển về chất của bản thân giai cấp công nhân
+*c. Địa vị chính trị - xã hội của giai cấp công nhân
+d. Giai cấp công nhân thành lập chính đảng của mình
+
+Câu 20: Sứ mệnh lịch sử của giai cấp công nhân về nhiệm vụ văn hóa tư tưởng:
+a. Cải tạo cái cũ, lỗi thời, lạc hậu của các hệ tư tưởng cũ
+b. Xây dựng cùng ý thức hệ tiên tiến của giai cấp công nhân, đó là chủ nghĩa Mác- Lênin
+c. Xây dựng cái mới tiến bộ trong lĩnh vực ý thức tư tưởng, tâm lý, lối sống và đời sống tinh thần của xã hội
+*d. Tất cả các đáp án
+
+Câu 21: Mục tiêu cao nhất của giai cấp công nhân khi thực hiện sứ mệnh lịch sử của mình là:
+a. Giải phóng lực lượng sản xuất lạc hậu lỗi thời
+b. Giải phóng giai cấp công nhân
+*c. Giải phóng con người
+d. Giải phóng tư liệu sản xuất có trình độ thấp
+
+Câu 22: Giai cấp công nhân thực hiện sứ mệnh lịch sử của mình thông qua đội tiền phong của mình là:
+a. Công đoàn
+b. Công hội đỏ
+*c. Đảng cộng sản
+d. Đảng cộng hòa
+
+Câu 23: Theo chủ nghĩa Mác- Lênin, sứ mệnh lịch sử của giai cấp công nhân sẽ hoàn thành bước thứ nhất khi nào?
+a. Giai cấp công nhân giành được nhà máy xí nghiệp của nhà tư bản
+b. Giai cấp công nhân thành lập Đảng cộng sản
+*c. Giai cấp công nhân giành được chính quyền nhà nước
+d. Giai cấp công nhân đấu tranh đòi tăng lượng, giảm giờ làm
+
+Câu 24: Đặc điểm nào khẳng định giai cấp công nhân là giai cấp tiến bộ nhất?
+*a. Đại biểu cho phương thức sản xuất hiện đại
+b. Có số lượng đông
+c. Có tinh thần quốc tế trong sáng
+d. Có tính tổ chức kỷ luật cao
+
+Câu 25: Điền từ vào chỗ trống để hoàn thiện luận điểm sau: "Chỉ có giải phóng......thì mới giải phóng được dân tộc; cả hai cuộc giải phóng này chỉ có thể là sự nghiệp của chủ nghĩa cộng sản và cách mạng thế giới" (Hồ Chí Minh).
+a. Nhân dân lao động
+*b. Giai cấp vô sản
+c. Giai cấp công nhân
+d. Giai cấp nông dân
+
+Câu 26: Đối tượng mà giai cấp công nhân xóa bỏ khi thực hiện sứ mệnh lịch sử của mình là?
+*a. Sở hữu tư nhân tư bản chủ nghĩa về tư liệu sản xuất chủ yếu
+b. Sở hữu tư nhân
+c. Toàn bộ tư liệu sản xuất của chủ nghĩa tư bản
+d. Toàn bộ những gì mà chủ nghĩa tư bản đã tạo ra
+
+Câu 27: Nội dung sứ mệnh lịch sử giai cấp công nhân là gì?
+a. Giải quyết mâu thuẫn cơ bản trong sơ sở hạ tầng tư bản chủ nghĩa
+*b. Giải quyết mâu thuẫn cơ bản về kinh tế và chính trị trong lòng phương thức sản xuất tư bản chủ nghĩa
+c. Giải quyết mâu thuẫn cơ bản giữa giai cấp công nhân và chủ nghĩa tư bản
+d. Giải quyết mâu thuẫn cơ bản trong kiến trúc thượng tầng tư bản chủ nghĩa
+
+Câu 28: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là gì?
+*a. Sự kết hợp giữa chủ nghĩa Mác- Lênin với phong trào công nhân
+b. Chủ nghĩa Mác – Lênin kết hợp với phong trào nông dân
+c. Chủ nghĩa Lênin kết hợp với phong trào công nhân
+d. Chủ nghĩa Mác- Lê nin kết hợp với phong trào công nhân và nhân dân lao động
+
+Câu 29: Theo C.Mác và Ph.Ăngghen, điều kiện tiên quyết để giải phóng người lao động ra khỏi các quan hệ bóc lột tư bản chủ nghĩa là gì?
+a. Tạo ra cách thức tổ chức lao động và kỷ luật lao động mới với năng suất cao
+b. Giải phóng và phát triển toàn diên con người
+c. Tạo ra một nền sản xuất công nghiệp hiện đại
+*d. Xóa bỏ chế độ sở hữu tư bản chủ nghĩa, đồng thời tiến hành thiết lập chế độ công hữu về các tư liệu sản xuất chủ yếu
+
+Câu 30: Vì sao Đảng cộng sản trở thành đội tiên phong, lãnh tụ chính trị và bộ tham mưu chiến đấu của giai cấp công nhân?*
+a. Là một tổ chức chính trị đạt được nhiều thành quả cách mạng nhất
+*b. Là một tổ chức chính trị tập trung những người công nhân tiên tiến nhất
+c. Là một tổ chức chính trị được giác ngộ lý tưởng cách mạng vô sản
+d. Là một tổ chức chính trị được trang bị lý luận cách mạng của chủ nghĩa Mác-Lênin
+
+Câu 31: Về kỹ năng, sau khi học xong lý luận về chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội, sinh viên cần đạt được điều gì?
+a. Quan điểm của chủ nghĩa Mác-Lê nin về chủ nghĩa xã hội và sự vận dụng sáng tạo của Đảng cộng sản
+b. Tin tưởng, ủng hộ sự lãnh đạo của Đảng cộng sản Việt Nam
+*c. Bước đầu biết vận dụng những tri thức có được vào phân tích những vấn đề cơ bản của chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ở Việt Nam hiện nay
+d. Khẳng định niềm tin vào chủ nghĩa xã hội
+
+Câu 32: Đặc điểm của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực văn hóa- tư tưởng là gì?
+a. Tư tưởng tư sản còn ảnh hưởng sâu rộng trong đời sống văn hóa tinh thần
+b. Tồn tại nhiều tàn dư của xã hội cũ
+c. Tư tưởng vô sản và tư tưởng phong kiến là chủ yếu
+*d. Tồn tại nhiều tư tưởng khác nhau, chủ yếu là tư tưởng vô sản và tư tưởng tư sản
+
+Câu 33: Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa được hiểu như thế nào?
+a. Tiếp thu, kế thừa những thành tựu mà nhân loại đã đạt được dưới chế độ tư bản chủ nghĩa
+b. Bỏ qua tất cả những gì thuộc về chủ nghĩa tư bản
+c. Tạo ra sự biến đổi về chất của xã hội trên tất cả các lĩnh vực của đời sống
+*d. Bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa
+
+Câu 34: Theo C.Mác và Ph.Ănggen: “Sự phát triển tự do của mỗi người là điều kiện cho sự phát triển tự do của tất cả mọi người” là mục tiêu tổng quát của lịch sử mà xã hội nào sẽ đạt tới?
+a. Chế độ xã hội mới
+b. Chế độ xã hội chủ nghĩa
+*c. Xã hội cộng sản chủ nghĩa
+d. Chủ nghĩa tư bản
+
+Câu 35: Thực chất của thời kỳ quá độ lên chủ nghĩa xã hội là gì?
+*a. Thời kỳ cải biến cách mạng từ xã hội tiền tư bản chủ nghĩa và tư bản chủ nghĩa sang xã hội xã hội chủ nghĩa
+b. Sắp xếp, bố trí lại các lực lượng sản xuất hiện có
+c. Cải tạo quan hệ xã hội cũ
+d. Xây dựng quan hệ sản xuất mới theo hướng tạo ra sự phát triển cân đối của nền kinh tế, bảo đảm phục vụ ngày càng tốt hơn đời sống nhân dân lao động
+
+Câu 36: Theo quan điểm của chủ nghĩa Mác- Lê nin, sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế- xã hội cộng sản chủ nghĩa được thực hiện bằng cách nào?
+a. Thông qua cải cách xã hội
+b. Thông qua cách mạng tư sản
+*c. Thông qua thời kỳ quá độ
+d. Thông qua cách mạng xã hội chủ nghĩa
+
+Câu 37: Trong các đặc trưng của chủ nghĩa xã hội, đặc trưng nào thể hiện thuộc tính bản chất của chủ nghĩa xã hội?*
+a. Có nền kinh tế phát triển cao dựa trên lực lượng hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu
+*b. Chủ nghĩa xã hội giải phóng giai cấp, giải phóng dân tộc, giải phóng xã hội, giải phóng con người, tạo điều kiện để con người phát triển toàn diện
+c. Có nhà nước mang bản chất của giai cấp công nhân, đại biểu cho lợi ích, quyền lực và ý chí của nhân dân lao động
+d. Là xã hội do nhân dân lao động làm chủ
+
+Câu 38: Những tiền đề vật chất quan trọng nhất cho sự ra đời của chủ nghĩa xã hội là gì?
+a. Giai cấp công nhân trưởng thành và trở thành một lực lượng chính trị độc lập
+b. Sản xuất vật chất phát triển tạo ra một lượng hàng hóa khổng lồ
+*c. Sự phát triển của lực lượng sản xuất và sự trưởng thành của giai cấp công nhân
+d. Sự lớn mạnh của giai cấp vô sản và sự phát triển của quan hệ sản xuất tư bản chủ nghĩa
+
+Câu 39: Đặc điểm cơ bản của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực xã hội là gì?
+a. Thực hiện thắng lợi sự nghiệp công nghiệp hóa, hiện đại hóa theo định hướng xã hội chủ nghĩa
+b. Đấu tranh ngăn chặn và khắc phục những tư tưởng và hành động sai trái
+*c. Là thời kỳ đấu tranh giai cấp chống áp bức bất công, xóa bỏ tệ nạn xã hội và những tàn dư của xã hội cũ để lại, thiết lập công bằng xã hội trên cơ sở thực hiện nguyên tắc phân phối theo lao động là chủ đạo
+d. Đấu tranh làm thất bại mọi âm mưu và hành động chống phá của các thế lực thù địch, bảo vệ độc lập dân tộc
+
+Câu 40: Điền vào chỗ trống để hoàn thành nội dung sau: “Xã hội xã hội chủ nghĩa mà nhân dân ta xây dựng là một xã hội dân giàu, nước mạnh, ….” (Văn kiện Đại hội Đảng lần thứ XI)
+*a. dân chủ, công bằng, văn minh
+b. công bằng, dân chủ, văn minh
+c. văn minh, dân chủ, công bằng
+d. công bằng, văn minh, dân chủ
+
+Câu 41: Bản chất kinh tế của Nhà nước xã hội chủ nghĩa thể hiện ở quan hệ sản xuất gì?
+*a. Quan hệ sản xuất công hữu về tư liệu sản xuất
+b. Quan hệ sản xuất tư nhân về tư liệu sản xuất
+c. Quan hệ sản xuất cá thể về tư liệu sản xuất
+d. Quan hệ sản xuất tàn dư về tư liệu sản xuất
+
+Câu 42: Bản chất chính trị của Nhà nước xã hội chủ nghĩa được biểu hiện bản chất của giai cấp, tầng lớp nào?
+a. Giai cấp nông dân
+b. Nhân dân lao động
+*c. Giai cấp công nhân
+d. Tầng lớp trí thức
+
+Câu 43: Dân chủ xã hội chủ nghĩa có mối quan hệ như thế nào với việc xây dựng và hoạt động của nhà nước xã hội chủ nghĩa?
+a. Là cơ sở, điều kiện
+b. Là cơ sở, động lực
+c. Là cơ sở, cách thức
+*d. Là cơ sở, nền tảng
+
+Câu 44: Nhà nước xã hội chủ nghĩa trở thành công cụ quan trọng trong việc thực thi quyền cơ bản gì của nhân dân?
+a. Quyền làm chủ chính trị của nhân dân
+b. Quyền làm chủ văn hóa của nhân dân
+c. Quyền làm chủ kinh tế của nhân dân
+*d. Quyền làm chủ của nhân dân
+
+
+Câu 45: Khi coi dân chủ là một giá trị xã hội mang tính toàn nhân loại, Chủ tịch Hồ Chí Minh đã khẳng định quan điểm nào?
+a. Dân chủ là dân làm chủ
+*b. Dân chủ là dân là chủ, dân làm chủ
+c. Dân chủ là dân làm chủ, dân là chủ
+d. Dân chủ là dân là chủ
+
+Câu 46: Căn cứ vào phạm vi tác động của quyền lực nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng đối nội, chức năng chính trị
+*b. Chức năng đối nội, chức năng đối ngoại
+c. Chức năng giai cấp, chức năng xã hội
+d. Chức năng kinh tế, chức năng chính trị
+
+Câu 47: Một trong những nội dung tiếp tục xây dựng và hoàn thiện nhà nước pháp quyền xã hội chủ nghĩa ở nước ta hiện nay là gì?
+a. Xây dựng các tổ chức nhà nước vững mạnh
+b. Hoàn thiện các hệ thống giám sát, phản biện xã hội.
+*c. Đấu tranh phòng chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Nâng cao vai trò quản lý của các tổ chức nhà nước
+
+Câu 48: Sự ra đời của nền dân chủ xã hội chủ nghĩa đánh dấu bước phát triển mới về điều gì?*
+a. Nội dung của dân chủ
+*b. Chất của dân chủ
+c. Lượng của dân chủ
+d. Gía trị của dân chủ
+
+Câu 49: Dân chủ xã hội chủ nghĩa là bản chất của chế độ ta, vừa là mục tiêu, vừa là động lực của sự phát triển đất nước” Nhận định trên của ai?
+a. Chủ tịch Hồ Chí Minh
+b. V.I.Lênin
+*c. Đảng cộng sản Việt Nam
+d. Các Mác
+
+Câu 50: Bản chất xã hội của dân chủ xã hội chủ nghĩa được thể hiện như thế nào?
+a. Luôn có sự kế thừa trong bất cứ thời kỳ nào của lịch sử
+b. Hình thành và phát triển một cách tự giác, đặt dưới sự lãnh đạo của giai cấp công nhân thông qua tổ chức Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+c. Hình thành và phát triển dưới sự lãnh đạo của Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+*d. Là sự kết hợp hài hòa về lợi ích giữa cá nhân, tập thể và lợi ích toàn xã hội
+
+Câu 51: Ai là người kế tục lãnh đạo cao nhất của Đảng Cộng sản Nga và sau đó là Đảng Cộng sản Liên Xô, đồng thời ảnh hưởng nhất đối với Quốc tế III?
+*a. J. Stalin
+b. Mikhail Gorbachev
+c. Nikolay Shervnik
+d. Mikhail Kalinin
+
+Câu 52: Vào những năm 40 của thế kỷ XX, cùng với quá trình phát triển của nền đại công nghiệp, sự ra đời hai giai cấp có lợi ích cơ bản đối lập nhau là:
+a. Giai cấp tư sản và giai cấp trí thức
+*b. Giai cấp tư sản và giai cấp vô sản
+c. Giai cấp vô sản và giai cấp lãnh đạo
+d. Giai cấp trí thức và giai cấp lãnh đạo
+
+Câu 53: Tư tưởng xã hội chủ nghĩa không tưởng Pháp đã có những giá trị nhất định nào?
+a. Thể hiện tinh thần phê phán, lên án chế độ quân chủ chuyên chế và chế độ tư bản chủ nghĩa đầy bất công, xung đột...
+b. Thức tỉnh giai cấp công nhân và người lao động trong cuộc đấu tranh chống chế độ quân chủ chuyên chế và chế độ tư bản chủ nghĩa đầy bất công, xung đột.
+c. Đưa ra nhiều luận điểm có giá trị về xã hội tương lai: về tổ chức sản xuất và phân phối sản phẩm xã hội; về sự nghiệp giải phóng phụ nữ, về vai trò lịch sử của nhà nước,…
+*d. Cả 3 đáp án đều đúng
+
+Câu 54: Tác phẩm “Chống Đuyrinh” là của ai?
+a. C. Mác
+*b. Ph. Ăngghen
+c. V.I. Lênin
+d. Hêghen
+
+Câu 55: Những nhà tư tưởng tiêu biểu của chủ nghĩa xã hội không tưởng phê phán đầu thế kỷ XIX?
+a. Xanh Ximông, A. Smith, R. Oen
+*b. Xanh Ximông, S. Phuriê, R. Oen
+c. Xanh Ximông, S. Phuriê, D. Ricardo
+d. L. Phoiơbắc, Xanh Ximông, S. Phuriê
+
+Câu 56: Phát kiến nào của C. Mác và Ăngghen đã khẳng định về phương diện kinh tế sự diệt vong không tránh khỏi của chủ nghĩa tư bản và sự ra đời tất yếu của CNXH?
+a. Chủ nghĩa duy vật lịch sử
+b. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+*c. Học thuyết về giá trị thặng dư
+d. Tuyên ngôn của Đảng Cộng sản
+
+Câu 57: Tác phẩm nào đã luận chứng rằng “sự phát triển của chủ nghĩa xã hội từ không tưởng đến khoa học và đánh giá công lao của các nhà xã hội chủ nghĩa không tưởng Anh, Pháp”?
+*a. Chống Đuyrinh
+b. Biện chứng của tự nhiên
+c. Tuyên ngôn của Đảng Cộng sản
+d. Làm gì?
+
+Câu 58: Thông qua tác phẩm nào C. Mác đã chuyển từ thế giới quan duy tâm sang thế giới quan duy vật?
+a. Tuyên ngôn của Đảng Cộng sản (1848)
+*b. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu (1844)
+c. Cách mạng và phản cách mạng ở Đức (1851-1852)
+d. Gia đình thần thánh (1845)
+
+Câu 59: Chủ nghĩa xã hội khoa học đã sử dụng phương pháp luận chung nhất nào?
+a. Phương pháp kết hợp lịch sử và lôgíc
+b. Phương pháp so sánh
+*c. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử
+d. Phương pháp khảo sát và phân tích về mặt chính trị xã hội dựa trên các điều kiện kinh tế cụ thể
+
+Câu 60: Tác phẩm "Cương lĩnh xây dựng chủ nghĩa xã hội ở nước Nga" do ai viết?
+*a. V.I. Lênin
+b. Hêghen
+c. Các Mác
+d. Ph. Ăngghen
+
+Câu 61: Nguồn gốc lý luận trực tiếp cho sự ra đời của chủ nghĩa xã hội khoa học:*
+a. Chủ nghĩa xã hội không tưởng phê phán Pháp
+b. Cả 3 đáp án đều đúng
+c. Kinh tế chính trị học cổ điển Anh
+d. Triết học cổ điển Đức
+
+Câu 62: Công lao của C. Mác và Ph. Ăngghen trong việc phát triển chủ nghĩa xã hội là gì?
+a. *Phát triển chủ nghĩa xã hội không tưởng thành chủ nghĩa xã hội khoa học
+b. Cả 3 đáp án đều đúng
+c. Xây dựng nhà nước xã hội chủ nghĩa đầu tiên trên thế giới
+d. Phát triển chủ nghĩa xã hội hiện thực thành chủ nghĩa xã hội lý thuyết
+
+Câu 63: “Giai cấp tư sản, trong quá trình thống trị giai cấp chưa đầy một thế kỷ, đã tạo ra những lực lượng sản xuất nhiều hơn và đồ sộ hơn lực lượng sản xuất của tất cả các thế hệ trước kia gộp lại” là đánh giá của ai?
+a. Lênin
+b. *C. Mác và Ăngghen
+c. A. Smith
+d. Xanh Ximông và Phurie
+
+Câu 64: V.I.L đã đấu tranh chống các trào lưu phi Mác-xít nhằm mở đường cho điều gì?
+a. Phái Mác-xít hợp pháp xâm nhập vào Nga
+b. Chủ nghĩa dân túy thâm nhập vào Nga
+c. Chủ nghĩa tư bản thâm nhập vào Nga
+*d. Chủ nghĩa Mác thâm nhập vào Nga
+
+Câu 65: Nhiệm vụ cơ bản của chuyên chính vô sản là gì?
+a. Xây dựng một lực lượng liên minh rộng lớp chống lại giai cấp thống trị
+b. Đấu tranh giành lại quyền và lợi ích hợp pháp cho giai cấp công nhân
+c. Phê phán các quan điểm của kẻ thù xuyên tạc
+d. *Thủ tiêu mọi chế độ người bóc lột người, xây dựng chủ nghĩa xã hội
+
+
+Câu 66: Phong trào công nhân nào tại châu Âu trong thế kỷ XIX đã có tính chất chính trị rõ rệt và góp phần quan trọng vào sự ra đời của chủ nghĩa xã hội khoa học?
+*a. Phong trào công nhân dệt ở Lion, Pháp
+b. Phong trào Hiến chương ở Anh
+c. Phong trào Hiến chương Đức
+d. Phong trào công nhân dệt ở Xilêdi, Đức
+
+Câu 67: V.I. Lênin đã chỉ rõ: “Học thuyết của Mác là học thuyết ....”. Điền vào chỗ trống:
+*a. vạn năng
+b. đa năng
+c. sáng thế
+d. toàn năng
+
+Câu 68: Những nhà triết học nào là đại diện tiêu biểu cho triết học cổ điển Đức?
+a. Xanh Ximông, S. Phurie và R. Oen
+b. C. Mác và Ăngghen
+c. A. Smith và D. Ricardo
+*d. Ph. Hêghen và L. Phoiơbắc
+
+Câu 69: Sự kiện chính trị nào đánh dấu công lao của V.I. Lênin biến chủ nghĩa xã hội khoa học từ lý luận thành hiện thực?
+*a. Sự ra đời của Nhà nước Xã hội chủ nghĩa đầu tiên trên thế giới - Nhà nước Xô Viết (1917)
+b. Xây dựng lý luận về Đảng cách mạng kiểu mới của giai cấp công nhân
+c. Đấu tranh chống các trào lưu phi Mác-xít
+d. V.I. Lênin viết tác phẩm “Một trong những vấn đề căn bản” năm 1917
+
+Câu 70: Phong trào Hiến chương của những người lao động ở Anh diễn ra trong khoảng thời gian nào?*
+a. 1838-1848
+b. 1830-1840
+c. 1834-1846
+*d. 1836-1848
+
+Câu 71: Theo V.I. Lênin, từ khi tác phẩm nào ra đời thì quan niệm duy vật lịch sử không còn là một giả thuyết mà đã trở thành một nguyên lý được chứng minh một cách khoa học?*
+a. Bộ Tư bản
+b. Tuyên Ngôn của Đảng Cộng sản
+c. Tình cảnh nước Anh
+d. Chống Đuyrinh
+
+
+Câu 72: Về mặt lý luận, nghiên cứu và học tập chủ nghĩa xã hội khoa học nhằm mục đích gì?
+*a. Bao gồm các đáp án
+b. Trang bị các nhận thức chính trị-xã hội và phương pháp luận khoa học về quá trình hình thành, phát triển của chủ nghĩa xã hội.
+c. Định hướng chính trị-xã hội cho hoạt động của Đảng, Nhà nước và nhân dân.
+d. Tạo niềm tin và lý tưởng cách mạng cho giai cấp công nhân.
+
+Câu 73: Đảng Cộng sản Trung Quốc từ khi thành lập (1/7/1921) đến nay đã trải qua 3 thời kỳ lớn nào?
+a. Thống nhất, cách mạng và cải cách, mở cửa
+*b. Cách mạng, xây dựng và cải cách, mở cửa
+c. Cải cách và xây dựng, mở cửa, cách mạng
+d. Cách mạng, mở cửa, xây dựng và cải cách
+
+Câu 74: Dưới sự phát triển của nền Đại Công nghiệp, đã xuất hiện mâu thuẫn chính giữa hai giai cấp đó là:
+a. Tư sản và địa chủ
+b. Nông dân và địa chủ
+*c. Tư sản và vô sản
+d. Chủ nô và Nô lệ
+
+Câu 75: Tác phẩm nào được coi là kim chỉ nam hành động của phong trào cộng sản và công nhân quốc tế?
+a. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+b. Học thuyết về giá trị thặng dư
+c. Góp phần phê phán triết học pháp quyền của Hêghen - Lời nói đầu
+*d. Tuyên ngôn của Đảng Cộng sản
+
+Câu 76: Năm 1831, phong trào đấu tranh của giai cấp công nhân Li-on đã giương cao khẩu hiệu là:
+a. Việc làm cho công nhân
+b. Cộng hòa hay là chết
+*c. Sống có việc làm hay là chết trong đấu tranh
+d. Tất cả vì cuộc sống
+
+Câu 77: Phương pháp nghiên cứu nào được xem là phương pháp có tính đặc thù của chủ nghĩa xã hội khoa học?
+a. Phương pháp so sánh
+b. Phương pháp kết hợp lịch sử và lôgíc
+c. *Phương pháp khảo sát và phân tích về mặt chính trị-xã hội dựa trên các điều kiện kinh tế-xã hội cụ thể
+d. Chủ nghĩa duy vật biện chứng và chủ nghĩa duy vật lịch sử
+
+Câu 78: Giá trị cốt lõi của tác phẩm Bộ Tư bản mà C. Mác và Ph. Ăngghen viết là gì?
+a. Học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân
+*b. Học thuyết về giá trị thặng dư
+c. Cả ba đáp án đều đúng
+d. Chủ nghĩa duy vật lịch sử
+
+Câu 79: Môn học Chủ nghĩa xã hội khoa học đặt mục tiêu về kỹ năng gì cho sinh viên?
+a. Sinh viên có thái độ tích cực với việc học tập các môn lý luận chính trị
+b. Sinh viên có kiến thức cơ bản hệ thống về sự ra đời, các giai đoạn phát triển; đối tượng, phương pháp và ý nghĩa của việc học tập môn học
+c. Cả ba đáp án đều đúng
+*d. Sinh viên biết vận dụng những tri thức đã học vào giải thích những vấn đề chính trị - xã hội trong đời sống hiện nay
+
+Câu 80: Nền đại công nghiệp phát triển đã làm cho phương thức sản xuất tư bản chủ nghĩa có bước phát triển như thế nào?
+a. Chậm lại
+b. Không thay đổi
+c. Thần tốc
+*d. Vượt bậc
+
+Câu 81: Các Mác và Ph. Ăngghen đã sử dụng thuật ngữ nào để nói về giai cấp công nhân?
+a. Giai cấp công nhân hiện đại
+b. Giai cấp vô sản
+*c. Tất cả các đáp án
+d. Giai cấp vô sản hiện đại
+
+Câu 82: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là sự kết hợp giữa:
+a. Chủ nghĩa Mác - Lênin và liên minh giai cấp tư sản nông dân công nhân
+b. Chủ nghĩa xã hội khoa học với phong trào đấu tranh của giai cấp nông dân
+*c. Chủ nghĩa Mác - Lênin với phong trào công nhân
+d. Chủ nghĩa Mác - Lênin với các cuộc cách mạng tư sản
+
+Câu 83: Theo C.Mác và Ph.Ăngghen, điều kiện tiên quyết để giải phóng người lao động ra khỏi các quan hệ bóc lột tư bản chủ nghĩa là gì?
+a. Tạo ra cách thức tổ chức lao động và kỷ luật lao động mới với năng suất cao
+b. Tạo ra một nền sản xuất công nghiệp hiện đại
+c. Giải phóng và phát triển toàn diện con người
+*d. Xóa bỏ chế độ sở hữu tư bản chủ nghĩa, đồng thời tiến hành thiết lập chế độ công hữu về các tư liệu sản xuất chủ yếu
+
+Câu 84: Điểm khác biệt của giai cấp công nhân Việt Nam khi ra đời so với giai cấp công nhân trên thế giới:
+a. Ra đời cùng lúc với giai cấp tư sản Việt Nam
+b. Các đáp án đều sai
+*c. Ra đời trước giai cấp tư sản Việt Nam
+d. Ra đời sau giai cấp tư sản Việt Nam
+
+Câu 85Vì sao Đảng Cộng sản trở thành đội tiên phong, lãnh tụ chính trị và bộ tham mưu chiến đấu của giai cấp công nhân?
+a. Là một tổ chức chính trị được giác ngộ lý tưởng cách mạng vô sản
+*b. Là một tổ chức chính trị tập trung những người công nhân tiên tiến nhất
+c. Là một tổ chức chính trị được trang bị lý luận cách mạng của chủ nghĩa Mác-Lênin
+d. Là một tổ chức chính trị đạt được nhiều thành quả cách mạng nhất
+
+Câu 86: Nhân tố chủ quan, quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử của mình:
+a. Có sự liên minh công - nông
+b. Có sự phát triển của bản thân giai cấp công nhân
+c. Có sự liên minh giữa giai cấp công nhân với quần chúng nhân dân
+*d. Có sự lãnh đạo của Đảng Cộng sản
+
+Câu 87: Biến đổi của giai cấp công nhân hiện đại so với giai cấp công nhân thế kỷ 19:
+a. Cả ba đáp án đều đúng
+b. Vẫn là lực lượng sản xuất hàng đầu của xã hội hiện đại
+*c. Xu hướng trung lưu hóa
+d. Vẫn bị giai cấp tư sản và chủ nghĩa tư bản bóc lột giá trị thặng dư
+
+Câu 88: Phong trào cộng sản và công nhân ở nhiều nước vẫn luôn là lực lượng đi đầu trong các cuộc đấu tranh vì:
+a. Vì dân sinh, dân chủ
+b. Vì hòa bình, hợp tác và phát triển
+*c. Bao gồm các đáp án
+d. Vì tiến bộ xã hội và chủ nghĩa xã hội
+
+Câu 89: Đâu là điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân?
+*a. Địa vị kinh tế, chính trị-xã hội của giai cấp công nhân
+b. Sự phát triển về số lượng và chất lượng của giai cấp công nhân
+c. Sự ra đời của Đảng Cộng sản
+d. Sự liên minh giai cấp giữa giai cấp công nhân với giai cấp nông dân và các tầng lớp lao động khác
+
+Câu 90: Cơ sở xã hội và nguồn bổ sung lực lượng quan trọng nhất của Đảng là giai cấp, tầng lớp nào?
+*a. Giai cấp công nhân
+b. Đội ngũ trí thức
+c. Giai cấp nông dân
+d. Tầng lớp doanh nhân
+
+Câu 91: Sứ mệnh lịch sử của giai cấp công nhân về nhiệm vụ văn hóa tư tưởng:
+a. Cải tạo cái cũ, lỗi thời, lạc hậu của các hệ tư tưởng cũ
+*b. Tất cả các đáp án
+c. Xây dựng cái mới tiến bộ trong lĩnh vực ý thức tư tưởng, tâm lý, lối sống và đời sống tinh thần của xã hội
+d. Xây dựng cùng ý thức hệ tiên tiến của giai cấp công nhân, đó là chủ nghĩa Mác-Lênin
+
+Câu 92: Sự phát triển của giai cấp công nhân tỷ lệ thuận với sự phát triển kinh tế ở những nước nào?
+a. Các đáp án đều sai
+b. Ở các nước đang phát triển
+*c. Ở các nước phát triển
+d. Ở các nước chậm phát triển
+
+Câu 93: Nội dung văn hóa, tư tưởng của giai cấp công nhân Việt Nam:
+a. Giữ vững và tăng cường sự lãnh đạo của Đảng
+b. Tăng cường xây dựng, chỉnh đốn Đảng
+c. Tham gia vào sự nghiệp công nghiệp hóa, hiện đại hóa đất nước để phát triển
+*d. Xây dựng con người mới xã hội chủ nghĩa, giáo dục đạo đức cách mạng
+
+Câu 94: Đối tượng mà giai cấp công nhân xóa bỏ khi thực hiện sứ mệnh lịch sử của mình là?
+a. Sở hữu tư nhân
+*b. Sở hữu tư nhân tư bản chủ nghĩa về tư liệu sản xuất chủ yếu
+c. Toàn bộ tư liệu sản xuất của chủ nghĩa tư bản
+d. Toàn bộ những gì mà chủ nghĩa tư bản đã tạo ra
+
+Câu 95: Ở các nước tư bản chủ nghĩa, mục tiêu đấu tranh trực tiếp của giai cấp công nhân và nhân dân lao động hiện nay là:
+a. Chống sự trỗi dậy của đội ngũ trí thức
+b. Giành chính quyền về tay giai cấp công nhân và nhân dân lao động
+c. Chống xu hướng trung lưu hóa
+*d. Chống bất công và bất bình đẳng xã hội
+
+
+Câu 96: Giai cấp công nhân hiện đại tăng nhanh về số lượng, thay đổi lớn về cơ cấu trong nền sản xuất hiện đại do những yếu tố:
+a. Cách mạng công nghiệp lần thứ tư
+b. Hội nhập quốc tế
+c. Bối cảnh mới của toàn cầu hóa
+*d. Bao gồm các đáp án
+
+Câu 97: Giai cấp công nhân với phương thức lao động công nghiệp trong nền sản xuất tư bản chủ nghĩa, được hiểu là:
+a. Giai cấp làm giàu cho xã hội trong thời công nghiệp hiện đại
+b. Giai cấp có số lượng đông nhất trong dân cư và trình độ xã hội hóa cao
+c. Giai cấp nghèo khổ nhất, có trình độ xã hội thấp
+*d. Những người lao động trực tiếp hay gián tiếp vận hành những công cụ sản xuất có tính chất công nghiệp ngày càng hiện đại, có trình độ xã hội hóa cao
+
+Câu 98: Giai cấp công nhân được các nhà kinh điển xác định theo 2 phương diện nào?
+a. Chính trị - xã hội và tư tưởng xã hội
+*b. Kinh tế - xã hội và chính trị - xã hội
+c. Kinh tế - xã hội và tư tưởng - xã hội
+d. Kinh tế - xã hội và văn hóa xã hội
+
+Câu 99: Hoàn thành luận điểm của C. Mác và Ph. Ăngghen: “Tất cả các giai cấp khác đều suy tàn và tiêu vong cùng với sự phát triển của đại công nghiệp, còn giai cấp vô sản lại là (.....) của bản thân nền đại công nghiệp.”
+*a. Sản phẩm
+b. Hiện thân
+c. Thành tựu
+d. Nền tảng
+
+Câu 100: Theo chủ nghĩa Mác-Lênin, sứ mệnh lịch sử của giai cấp công nhân sẽ hoàn thành bước thứ nhất khi nào?
+*a. Giai cấp công nhân giành được chính quyền nhà nước
+b. Giai cấp công nhân đấu tranh đòi tăng lương, giảm giờ làm
+c. Giai cấp công nhân thành lập Đảng Cộng sản
+d. Giai cấp công nhân giành được nhà máy xí nghiệp của nhà tư bản
+
+Câu 101: Nội dung chính trị - xã hội của giai cấp công nhân Việt Nam:
+a. Xây dựng hệ giá trị văn hóa và con người Việt Nam, hoàn thiện nhân cách
+b. Thực hiện thắng lợi mục tiêu công nghiệp hóa, hiện đại hóa
+*c. Giữ vững bản chất giai cấp công nhân của Đảng
+d. Rèn luyện lối sống, tác phong công nghiệp, văn minh hiện đại
+
+
+Câu 102: Yếu tố nào là hạt nhân chính trị quan trọng của giai cấp công nhân theo chủ nghĩa Mác-Lênin?
+a. Nhà nước Tư sản
+b. Các công đoàn
+c. Các nghiệp đoàn tư nhân
+*d. Đảng Cộng sản
+
+Câu 103: Đâu là cơ sở khách quan để giai cấp công nhân hiện đại phát triển mạnh mẽ cả về số lượng và chất lượng?
+a. Tri thức hóa
+*b. Công nghiệp hóa
+c. Nông nghiệp hóa
+d. Trung lưu hóa
+
+Câu 104: Đối diện với quan hệ sản xuất tư bản chủ nghĩa, giai cấp công nhân có đặc trưng cơ bản:
+*a. Giai cấp công nhân làm thuê hiện đại, vì mất các tư liệu sản xuất của bản thân, nên buộc phải bán sức lao động của mình để kiếm sống
+b. Đại diện cho quan hệ sản xuất tư bản chủ nghĩa
+c. Chủ sở hữu tư liệu sản xuất
+d. Giai cấp bị mất hết đất đai và nghèo khổ nhất
+
+Câu 105: Vì sao giai cấp công nhân Việt Nam sớm trở thành lực lượng chính trị độc lập?
+a. Kiên định trong giải quyết vấn đề dân tộc trong thời đại mới
+b. Kế thừa truyền thống kiên cường bất khuất và yêu nước của dân tộc
+c. Có liên hệ mật thiết với giai cấp nông dân
+*d. Vì sớm hình thành một chính đảng thực sự cách mạng
+
+Câu 106: Theo quan điểm của C.Mác và Ph.Ăngghen: Trong công trường thủ công và trong nghề thủ công, người công nhân sử dụng công cụ của mình, còn trong công xưởng thì người công nhân:*
+a. Không phải sử dụng máy móc
+*b. Phải phục vụ máy móc
+c. Phải phục chế máy móc
+d. Phải phục tùng máy móc
+
+Câu 107: Ở các nước xã hội chủ nghĩa, giai cấp công nhân đóng vai trò gì để thực hiện nội dung kinh tế giải phóng lực lượng sản xuất?
+*a. Nòng cốt
+b. Chủ chốt
+c. Chủ đạo
+d. Cả ba đều đúng
+
+Câu 108: Theo C. Mác và Ph. Ăngghen, bộ phận công nhân nào là tiêu biểu cho giai cấp công nhân hiện đại?
+a. Công nhân hầm mỏ
+b. Công nhân công trường thủ công
+c. Công nhân công trường thủ công
+*d. Công nhân công nghiệp công xưởng
+
+Câu 109: Điểm tương đối ổn định của giai cấp công nhân hiện nay so với giai cấp công nhân thế kỷ 19:
+*a. Là lực lượng sản xuất hàng đầu của xã hội hiện đại
+b. Xu hướng “trung lưu hóa”
+c. Là những người chủ nhỏ
+d. Xu hướng “trí tuệ hóa”
+
+Câu 110: Quy luật chung, phổ biến cho sự ra đời của Đảng Cộng sản là gì?
+a. Chủ nghĩa Mác – Lênin kết hợp với phong trào nông dân
+b. Chủ nghĩa Lênin kết hợp với phong trào công nhân
+c. Chủ nghĩa Mác-Lênin kết hợp với phong trào công nhân và nhân dân lao động
+*d. Sự kết hợp giữa chủ nghĩa Mác-Lênin với phong trào công nhân
+
+Câu 111: Giai cấp công nhân Việt Nam được Đảng xác định là một lực lượng xã hội như thế nào?
+a. Một lực lượng xã hội to lớn, đã phát triển hoàn toàn, chỉ bao gồm những người lao động có trình độ cao
+b. Một lực lượng xã hội to lớn, đã phát triển hoàn toàn, chỉ bao gồm những người lao động trí óc
+*c. Một lực lượng xã hội to lớn, đang phát triển, bao gồm những người lao động chân tay và trí óc
+d. Một lực lượng xã hội nhỏ, chưa phát triển, bao gồm những người lao động chân tay và trí óc
+
+Câu 112: Cách mạng vô sản trên thực tế được thực hiện bằng con đường nào?
+a. Con đường thỏa hiệp
+b. Con đường chính trị
+*c. Bạo lực cách mạng
+d. Con đường hòa bình
+
+Câu 113: “Chỉ có giải phóng......thì mới giải phóng được dân tộc; cả hai cuộc giải phóng này chỉ có thể là sự nghiệp của chủ nghĩa cộng sản và cách mạng thế giới” (Hồ Chí Minh).
+a. Giai cấp nông dân
+*b. Giai cấp vô sản
+c. Nhân dân lao động
+d. Giai cấp công nhân
+
+Câu 114: Nội dung kinh tế của sứ mệnh lịch sử giai cấp công nhân:
+a. Phấn đấu cho lợi ích riêng của giai cấp khác
+*b. Đại biểu cho lợi ích chung của xã hội
+c. Phấn đấu cho lợi ích của riêng giai cấp mình
+d. Lợi ích chung và riêng thống nhất
+
+Câu 115: Giai cấp công nhân thực hiện sứ mệnh lịch sử của mình thông qua đội tiền phong của mình là:
+a. Công đoàn
+*b. Đảng Cộng sản
+c. Công hội đỏ
+d. Đảng cộng hòa
+
+Câu 116: Ở các nước tư bản chủ nghĩa, đấu tranh giành chính quyền về tay giai cấp công nhân và nhân dân lao động là mục tiêu đấu tranh:*
+a. Bạo loạn
+b. Trực tiếp
+c. Gián tiếp
+*d. Lâu dài
+
+Câu 117: Một trong những điều kiện khách quan quy định sứ mệnh lịch sử của giai cấp công nhân:
+a. Sự phát triển về chất của bản thân giai cấp công nhân
+b. Sự tăng nhanh về số lượng và chất lượng của giai cấp công nhân
+*c. Địa vị chính trị - xã hội của giai cấp công nhân
+d. Giai cấp công nhân thành lập chính đảng của mình
+
+Câu 118: Nội dung sứ mệnh lịch sử giai cấp công nhân là gì?
+*a. Giải quyết mâu thuẫn cơ bản về kinh tế và chính trị trong lòng phương thức sản xuất tư bản chủ nghĩa
+b. Giải quyết mâu thuẫn cơ bản trong cơ sở hạ tầng tư bản chủ nghĩa
+c. Giải quyết mâu thuẫn cơ bản trong kiến trúc thượng tầng tư bản chủ nghĩa
+d. Giải quyết mâu thuẫn cơ bản giữa giai cấp công nhân và chủ nghĩa tư bản
+
+Câu 119: Trong chăm lo xây dựng giai cấp công nhân Việt Nam, công đoàn có vai trò:
+*a. Quan trọng trực tiếp
+b. Quyết định
+c. Quan trọng gián tiếp
+d. Không quan trọng
+
+Câu 120: Đặc điểm nào khẳng định giai cấp công nhân là giai cấp tiến bộ nhất?
+*a. Đại biểu cho phương thức sản xuất hiện đại
+b. Có tính tổ chức kỷ luật cao
+c. Có tinh thần quốc tế trong sáng
+d. Có số lượng đông
+
+Câu 121: Theo Đại hội lần thứ XIII của Đảng, xây dựng giai cấp công nhân Việt Nam trong thời kỳ đẩy mạnh công nghiệp hóa, hiện đại hóa đất nước bao gồm những nội dung nào sau đây?
+a. Tăng cường tuyên truyền giáo dục chính trị
+b. Nâng cao bản lĩnh chính trị, trình độ học vấn chuyên môn
+c. Xây dựng giai cấp công nhân hiện đại, lớn mạnh
+*d. Bao gồm các đáp án
+
+Câu 122: Vấn đề nổi bật nhất đối với việc thực hiện sứ mệnh lịch sử của giai cấp công nhân Việt Nam hiện nay trong lĩnh vực kinh tế là gì?
+*a. Giai cấp công nhân phát huy vai trò và trách nhiệm của lực lượng đi đầu trong sự nghiệp đẩy mạnh công nghiệp hóa, hiện đại hóa đất nước
+b. Tất cả các đáp án đều đúng
+c. Giữ vững bản chất giai cấp công nhân của Đảng
+d. Giáo dục đạo đức cách mạng, rèn luyện lối sống, tác phong công nghiệp, văn minh, hiện đại
+
+Câu 123: Khái niệm mới để chỉ giai cấp công nhân theo xu hướng trí tuệ hóa:
+a. Công nhân hiện đại
+*b. Công nhân áo trắng
+c. Công nhân khoáng sản
+d. Công nhân công trường thủ công
+
+Câu 124: Theo chủ nghĩa Mác-Lênin, biện pháp cơ bản nào là tiền đề thực tiễn tuyệt đối cần thiết để phát triển giai cấp công nhân về số lượng và chất lượng?
+a. Cải cách hành chính
+b. Chuyển đổi cơ cấu kinh tế
+*c. Phát triển công nghiệp
+d. Phát triển nông nghiệp
+
+Câu 125: Thuật ngữ nào theo nghĩa hẹp C.Mác và Ph.Ăngghen dùng để chỉ các giai cấp công nhân trong các ngành sản xuất khác nhau, trong những giai đoạn phát triển khác nhau của công nghiệp?*
+a. Công nhân hiện đại
+*b. Công nhân khoáng sản
+c. Lực lượng sản xuất hiện đại
+d. Công nhân đại công nghiệp
+
+Câu 126: Trong cuộc cách mạng về tư tưởng, giai cấp công nhân cần xây dựng và củng cố ý thức hệ tiên tiến của giai cấp mình làm nền tảng tinh thần của xã hội. Ý thức hệ đó là:
+*a. Chủ nghĩa Mác - Lênin
+b. Hệ tư tưởng phong kiến
+c. Chủ nghĩa hiện sinh
+d. Hệ tư tưởng dân chủ tư sản
+
+Câu 127: “Tính tổ chức và kỷ luật, tự giác và đoàn kết trong cuộc đấu tranh tự giải phóng mình và giải phóng xã hội” đây là những phẩm chất của giai cấp nào?
+a. Đội ngũ trí thức
+b. Giai cấp địa chủ
+*c. Giai cấp công nhân
+d. Giai cấp tư sản
+
+
+Câu 128: Nguyên nhân cơ bản, sâu xa của đấu tranh giai cấp trong xã hội hiện đại ngày nay:
+a. Xung đột về lợi ích cơ bản giữa giai cấp công nhân và giai cấp nông dân
+*b. Xung đột về lợi ích cơ bản giữa giai cấp tư sản và giai cấp công nhân
+c. Xung đột về lợi ích cơ bản giữa giai cấp tư sản và giai cấp nông dân
+d. Phong trào đấu tranh vì tiến bộ, công bằng, dân sinh vẫn diễn ra
+
+Câu 129: Nền tảng tư tưởng của Đảng mà giai cấp công nhân Việt Nam đấu tranh bảo vệ là:
+a. Các đáp án đều sai
+b. Chủ nghĩa Mác - Lênin và Cương lĩnh chính trị của Đảng
+*c. Chủ nghĩa Mác - Lênin và Tư tưởng Hồ Chí Minh
+d. Tư tưởng Hồ Chí Minh và Cương lĩnh chính trị của Đảng
+
+Câu 130: Mục tiêu cao nhất của giai cấp công nhân khi thực hiện sứ mệnh lịch sử của mình là:
+a. Giải phóng lực lượng sản xuất lạc hậu lỗi thời
+b. Giải phóng giai cấp công nhân
+c. Giải phóng tư liệu sản xuất có trình độ thấp
+*d. Giải phóng con người
+
+
+Câu 131: Chủ nghĩa xã hội có nền kinh tế phát triển cao dựa trên lực lượng sản xuất hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu, đây là đặc trưng về phương diện:
+A. Chính trị
+B. Văn hóa - tinh thần
+*C. Kinh tế
+D. Tư tưởng
+
+Câu 132: Đại hội XIII của Đảng đã xác định mục tiêu đến giữa thế kỷ XXI, nước ta trở thành nước phát triển theo định hướng xã hội chủ nghĩa với mục tiêu:
+A. Đến năm 2030 trở thành nước phát triển có thu nhập cao
+B. Các đáp án đều đúng
+C. Đến năm 2030, là nước đang phát triển, có công nghiệp hiện đại, thu nhập trung bình thấp
+*D. Đến năm 2025 là nước đang phát triển, có công nghiệp theo hướng hiện đại, vượt qua mức thu nhập trung bình
+
+Câu 133: Đặc điểm của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực văn hóa - tư tưởng là gì?
+*A. Tồn tại nhiều tư tưởng khác nhau, chủ yếu là tư tưởng vô sản và tư tưởng tư sản
+B. Tồn tại nhiều tàn dư của xã hội cũ
+C. Tư tưởng vô sản và tư tưởng phong kiến là chủ yếu
+D. Tư tưởng tư sản còn ảnh hưởng sâu rộng trong đời sống văn hóa tinh thần
+
+Câu 134: C. Mác cho rằng giữa xã hội tư bản chủ nghĩa và xã hội cộng sản chủ nghĩa... nhà nước của thời kỳ ấy không thể là cái gì khác hơn là:
+A. Nền chuyên chính cách mạng của giai cấp thống trị tư sản
+*B. Nền chuyên chính cách mạng của giai cấp vô sản
+C. Nền chuyên chính cách mạng xã hội tư bản chủ nghĩa
+D. Các đáp án đều sai
+
+Câu 135: “Về lý luận, không thể nghi ngờ gì được rằng giữa chủ nghĩa tư bản và chủ nghĩa cộng sản, có một thời kỳ quá độ nhất định” là 
+Câu nói của ai?
+*A. V.I. Lênin
+B. Ph. Ăngghen
+C. C. Mác
+D. Hêghen
+
+Câu 136:* Cương lĩnh xây dựng đất nước trong thời kỳ quá độ lên chủ nghĩa xã hội (1991) đã xác định mô hình chủ nghĩa xã hội ở nước ta với mấy đặc trưng?*
+A. 8 đặc trưng
+B. 7 đặc trưng
+*C. 6 đặc trưng
+D. 5 đặc trưng
+
+Câu 137: Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa là tạo ra sự biến đổi:
+A. Về lượng của xã hội trên tất cả các lĩnh vực
+B. Về độ của xã hội trên tất cả các lĩnh vực
+C. Về tư tưởng của xã hội
+*D. Về chất của xã hội trên tất cả các lĩnh vực
+
+Câu 138: Đến Đại hội nào, nhận thức của Đảng ta về chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội đã có bước *phát triển mới, phát triển mô hình chủ nghĩa xã hội Việt Nam với *tám đặc trưng?*
+A. Đại hội VII
+*B. Đại hội XI
+C. Đại hội IV
+D. Đại hội XII
+
+Câu 139:Quá độ lên chủ nghĩa xã hội bỏ qua chế độ tư bản chủ nghĩa được hiểu như thế nào?
+A. Bỏ qua tất cả những gì thuộc về chủ nghĩa tư bản
+B. Tiếp thu, kế thừa những thành tựu mà nhân loại đã đạt được dưới chế độ tư bản chủ nghĩa
+*C. Bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa
+D. Tạo ra sự biến đổi về chất của xã hội trên tất cả các lĩnh vực của đời sống
+
+Câu 140: Vai trò của kinh tế quốc doanh và kinh tế tập thể trong nền kinh tế quốc dân là gì?
+A. Yếu tố hỗ trợ của nền kinh tế quốc dân
+B. Đối lập lợi ích của nền kinh tế quốc dân
+*C. Nền tảng của nền kinh tế quốc dân
+D. Các đáp án đều đúng
+
+Câu 141: Hai hình thức quá độ từ chủ nghĩa tư bản lên chủ nghĩa cộng sản là:
+*A. Quá độ trực tiếp và quá độ gián tiếp
+B. Quá độ cơ bản và không cơ bản
+C. Quá độ lâu dài và quá độ nhảy vọt
+D. Quá độ khách quan và quá độ chủ quan
+
+Câu 142: Thời kỳ quá độ trực tiếp từ chủ nghĩa tư bản lên chủ nghĩa cộng sản đối với những nước nào?
+A. Những nước đang trải qua chủ nghĩa tư bản phát triển
+*B. Những nước đã trải qua chủ nghĩa tư bản phát triển
+C. Những nước chậm phát triển
+D. Những nước chưa trải qua chủ nghĩa tư bản phát triển
+
+Câu 143: Học thuyết hình thái kinh tế - xã hội của chủ nghĩa Mác - Lênin đã chỉ ra tính tất yếu sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế - xã hội cộng sản chủ nghĩa, đó là quá trình:
+*A. Lịch sử, tự nhiên
+B. Tất yếu, tự nhiên
+C. Lịch sử, ngẫu nhiên
+D. Tất yếu, tất nhiên
+
+Câu 144: Theo C. Mác và Ph. Ăngghen: “Sự phát triển tự do của mỗi người là điều kiện cho sự phát triển tự do của tất cả mọi người” là mục tiêu tổng quát của lịch sử mà xã hội nào sẽ đạt tới?
+A. Chế độ xã hội chủ nghĩa
+B. Chủ nghĩa tư bản
+C. Chế độ xã hội mới
+*D. Xã hội cộng sản chủ nghĩa
+
+Câu 145: Theo quan điểm của chủ nghĩa Mác - Lênin, sự thay thế hình thái kinh tế - xã hội tư bản chủ nghĩa bằng hình thái kinh tế - xã hội cộng sản chủ nghĩa được thực hiện bằng cách nào?
+A. Thông qua cải cách xã hội
+*B. Thông qua cách mạng xã hội chủ nghĩa
+C. Thông qua cách mạng tư sản
+D. Thông qua thời kỳ quá độ
+
+Câu 146: Những điều kiện chủ yếu ra đời của chủ nghĩa xã hội:
+*A. Điều kiện kinh tế và điều kiện chính trị - xã hội
+B. Điều kiện kinh tế và điều kiện tư tưởng xã hội
+C. Điều kiện mâu thuẫn xã hội sâu sắc
+D. Điều kiện chính trị - xã hội và điều kiện tư tưởng
+
+Câu 147: Những tiền đề vật chất quan trọng nhất cho sự ra đời của chủ nghĩa xã hội là gì?
+*A. Sự phát triển của lực lượng sản xuất và sự trưởng thành của giai cấp công nhân
+B. Sản xuất vật chất phát triển tạo ra một lượng hàng hóa khổng lồ
+C. Sự lớn mạnh của giai cấp vô sản và sự phát triển của quan hệ sản xuất tư bản chủ nghĩa
+D. Giai cấp công nhân trưởng thành và trở thành một lực lượng chính trị độc lập
+
+Câu 148: Đặc điểm quá độ lên chủ nghĩa xã hội ở Việt Nam là:
+A. Bỏ qua chế độ phong kiến
+*B. Bỏ qua chế độ tư bản chủ nghĩa
+C. Các đáp án đều đúng
+D. Bỏ qua thời kỳ cách mạng cải tạo xã hội cũ
+
+Câu 149: Nhận thức của Đảng Cộng sản Việt Nam và nhân dân Việt Nam về chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ngày càng sáng rõ hơn vào thời điểm:*
+A. Đại hội VII
+B. Đại hội XII
+C. Đại hội IV (1976)
+D. Đại hội XI.
+
+Câu 150: Trong các đặc trưng của chủ nghĩa xã hội, đặc trưng nào thể hiện thuộc tính bản chất của chủ nghĩa xã hội?
+A. Là xã hội do nhân dân lao động làm chủ
+B. Có nhà nước mang bản chất của giai cấp công nhân, đại biểu cho lợi ích, quyền lực và ý chí của nhân dân lao động
+*C. Chủ nghĩa xã hội giải phóng giai cấp, giải phóng dân tộc, giải phóng xã hội, giải phóng con người, tạo điều kiện để con người phát triển toàn diện
+D. Có nền kinh tế phát triển cao dựa trên lực lượng hiện đại và chế độ công hữu về tư liệu sản xuất chủ yếu
+
+Câu 151: Đặc trưng cơ bản nào của chủ nghĩa xã hội đang xây dựng ở Việt Nam thể hiện mục tiêu của xã hội xã hội chủ nghĩa?
+A. Do nhân dân lao động làm chủ
+B. Có nhà nước pháp quyền xã hội chủ nghĩa
+*C. Dân giàu, nước mạnh, dân chủ, công bằng, văn minh
+D. Có nền văn hóa tiên tiến, đậm đà bản sắc dân tộc
+
+Câu 152: Các nhà sáng lập chủ nghĩa Mác - Lênin đánh giá thời kỳ quá độ ở những nước chưa trải qua chủ nghĩa tư bản phát triển như thế nào?
+A. Những cuộc đấu tranh đẫm máu
+B. Những cơn đau khổ kéo dài
+C. Những quá trình cải tạo chồng chéo
+*D. Những cơn đau đẻ kéo dài
+
+Câu 153: Đặc trưng thể hiện thuộc tính bản chất của chủ nghĩa xã hội:
+A. Chủ nghĩa xã hội bảo đảm bình đẳng, đoàn kết giữa các dân tộc
+B. Chủ nghĩa xã hội có nền văn hóa phát triển cao
+*C. Chủ nghĩa xã hội là chế độ do nhân dân lao động làm chủ
+D. Chủ nghĩa xã hội có nền kinh tế phát triển cao dựa trên lực lượng sản xuất hiện đại
+
+Câu 154: Đại hội XIII của Đảng đã xác định mục tiêu đến giữa thế kỷ XXI, nước ta trở thành nước phát triển theo định hướng xã hội chủ nghĩa với các mục tiêu cụ thể: Đến năm 2030, kỷ niệm 100 năm thành lập Đảng:
+A. Thu nhập trung bình cao
+B. Là nước đang phát triển
+C. Có công nghiệp hiện đại
+*D. Các đáp án đều đúng
+
+Câu 155: Thực chất của thời kỳ quá độ lên chủ nghĩa xã hội là gì?
+A. Sắp xếp, bố trí lại các lực lượng sản xuất hiện có
+B. Xây dựng quan hệ sản xuất mới theo hướng tạo ra sự phát triển cân đối của nền kinh tế, bảo đảm phục vụ ngày càng tốt hơn đời sống nhân dân lao động
+C. Cải tạo quan hệ xã hội cũ
+*D. Thời kỳ cải biến cách mạng từ xã hội tiền tư bản chủ nghĩa và tư bản chủ nghĩa sang xã hội xã hội chủ nghĩa
+
+Câu 156: Cách mạng vô sản là cuộc cách mạng của giai cấp công nhân và nhân dân lao động dưới sự lãnh đạo của Đảng Cộng sản trên thực tế được thực hiện bằng con đường:
+*A. Con đường bạo lực cách mạng
+B. Con đường bầu cử chính trị công khai
+C. Con đường đấu tranh bất bạo động
+D. Con đường thỏa hiệp xây dựng xã hội
+
+Câu 157: Sự trưởng thành vượt bậc của giai cấp công nhân được đánh dấu bằng:
+A. Sự chuyển hướng đấu tranh cách mạng sang tự phát
+B. Các đáp án đều đúng
+C. Sự xuất hiện của phong trào công nhân
+*D. Sự ra đời của Đảng Cộng sản
+
+Câu 158: Điền vào chỗ trống: “Xã hội xã hội chủ nghĩa mà nhân dân ta xây dựng là một xã hội dân giàu, nước mạnh, ….”
+*A. Dân chủ, công bằng, văn minh
+B. Văn minh, dân chủ, công bằng
+C. Công bằng, văn minh, dân chủ
+D. Công bằng, dân chủ, văn minh
+
+Câu 159: Về kỹ năng, sau khi học xong lý luận về chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội, sinh viên cần đạt được điều gì?
+A. Khẳng định niềm tin vào chủ nghĩa xã hội
+*B. Bước đầu biết vận dụng những tri thức có được vào phân tích những vấn đề cơ bản của chủ nghĩa xã hội và con đường đi lên chủ nghĩa xã hội ở Việt Nam hiện nay
+C. Quan điểm của chủ nghĩa Mác-Lênin về chủ nghĩa xã hội và sự vận dụng sáng tạo của Đảng cộng sản
+D. Tin tưởng, ủng hộ sự lãnh đạo của Đảng cộng sản Việt Nam
+
+Câu 160: Đặc điểm cơ bản của thời kỳ quá độ lên chủ nghĩa xã hội trên lĩnh vực xã hội là gì?
+A. Đấu tranh làm thất bại mọi âm mưu và hành động chống phá của các thế lực thù địch, bảo vệ độc lập dân tộc
+B. Thực hiện thắng lợi sự nghiệp công nghiệp hóa, hiện đại hóa theo định hướng xã hội chủ nghĩa
+C. Đấu tranh ngăn chặn và khắc phục những tư tưởng và hành động sai trái
+*D. Là thời kỳ đấu tranh giai cấp chống áp bức bất công, xóa bỏ tệ nạn xã hội và những tàn dư của xã hội cũ để lại, thiết lập công bằng xã hội trên cơ sở thực hiện nguyên tắc phân phối theo lao động là chủ đạo
+
+Câu 161:Theo Chủ nghĩa Mác- Lênin, nền dân chủ mới mà giai cấp công nhân và nhân dân lao động đang hướng tới nội dung nào?
+*a. Dân chủ xã hội chủ nghĩa
+b. Dân chủ tư sản
+c. Dân chủ đại diện
+d. Dân chủ hình thức
+
+Câu 162: Dân chủ xã hội chủ nghĩa là bản chất của chế độ ta, vừa là mục tiêu, vừa là động lực của sự phát triển đất nước” Nhận định trên của ai?
+a. V.I.Lênin
+*b. Đảng cộng sản Việt Nam
+c. Chủ tịch Hồ Chí Minh
+d. Các Mác
+
+Câu 163: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam có sự khác biệt cơ bản nào đối với các nhà nước pháp quyền khác?
+a. Mang bản chất của tầng lớp trí thức
+b. Mang bản chất của giai cấp tiểu tư sản
+*c. Mang bản chất của giai cấp công nhân
+d. Mang bản chất giai cấp nông dân
+
+Câu 164: Yếu tố đảm bảo xây dựng nền dân chủ xã hội chủ nghĩa ở nước ta là:
+a. Xây dựng đội ngũ cán bộ, công chức trong sạch, có năng lực
+*b. Tăng cường công tác giám sát, phản biện xã hội
+c. Cải cách thể chế và phương thức hoạt động của Nhà nước
+d. Đấu tranh phòng chống tham nhũng, lãng phí
+
+Câu 165: Nhiệm vụ cấp bách, lâu dài của quá trình xây dựng Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam:
+a. Xây dựng và hoàn thiện thể chế kinh tế thị trường
+b. Cải cách thể chế và phương thức hoạt động của Nhà nước
+*c. Phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Xây dựng Nhà nước pháp quyền xã hội chủ nghĩa dưới sự lãnh đạo của Đảng
+
+Câu 166: Trong quá trình xây dựng và hoàn thiện Nhà nước pháp quyền xã hội chủ nghĩa, việc đẩy mạnh cải cách hành chính, giảm mạnh và bãi bỏ các thủ tục hành chính gây phiền hà cho tổ chức và công dân thuộc nội dung:
+a. Đấu tranh phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+b. Xây dựng đội ngũ cán bộ, công chức trong sạch, có năng lực
+c. Xây dựng, hoàn thiện thể chế kinh tế thi trường
+*d. Cải cách thể chế và phương thức hoạt động của Nhà nước
+
+Câu 167: Đại hội XIII của Đảng nhấn mạnh: "Quyền lực nhà nước là thống nhất, có sự phân công rành mạch, phối hợp chặt chẽ và tăng cường kiểm soát quyền lực ...."
+a. Đảng Cộng sản
+b. Nhân dân
+*c. Nhà nước
+d. Mặt trận Tổ quốc
+
+Câu 168: Đề cao vai trò tối thượng của Hiến pháp và pháp luật; đề cao quyền lợi và nghĩa vụ của công dân, bảo đảm quyền con người là nội dung được nêu ra trong văn kiện nào của Đảng cộng sản Việt Nam?
+*a. Cương lĩnh xây dựng đất nước trong thời kỳ quá độ lên chủ nghĩa xã hội
+b. Công cuộc đổi mới đất nước theo định hướng xã hội chủ nghĩa
+c. Tiến trình phát triển của công cuộc đổi mới đất nước
+d. Những nhiệm vụ trọng tâm của thời kỳ quá độ lên Chủ nghĩa xã hội
+
+Câu 169: Nhà nước Pháp quyền xã hội chủ nghĩa đặt dưới sự lãnh đạo của:
+*a. Đảng Cộng sản Việt Nam
+b. Chính phủ
+c. Quốc Hội
+d. Mặt trận Tổ Quốc
+
+Câu 170: Theo Hiến pháp 2013, hoạt động của Nhà nước được giám sát bởi nhân dân với phương châm gì?
+a. Nhà nước lắng nghe ý kiến của nhân dân và chịu sự kiểm soát của nhân dân
+b. Nhà nước phải được hoàn thiện bằng việc ban hành các cơ chế và biện pháp kiểm soát, ngăn ngừa các hiện tượng tiêu cực…
+c. Nhà nước phục vụ nhân dân, gắn bó mật thiết với nhân dân, thực hiện đầy đủ các quyền làm chủ của nhân dân
+*d. Dân biết, dân bàn, dân kiểm tra thông qua các tổ chức, các cá nhân được nhân dân ủy nhiệm
+
+Câu 171: Khi coi dân chủ là một giá trị xã hội mang tính toàn nhân loại, Chủ tịch Hồ Chí Minh đã khẳng định quan điểm nào?
+*a. Dân chủ là dân là chủ, dân làm chủ
+b. Dân chủ là dân làm chủ, dân là chủ
+c. Dân chủ là dân làm chủ
+d. Dân chủ là dân là chủ
+
+Câu 172: Điều kiện tiên quyết để phát huy dân chủ xã hội chủ nghĩa và xây dựng nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam:
+a. Xây dựng, hoàn thiện thể chế kinh tế thị trường
+*b. Xây dựng Đảng Cộng sản Việt Nam trong sạch vững mạnh
+c. Củng cố khối liên minh công nông
+d. Các đáp án đều đúng
+
+Câu 173: Nền dân chủ xã hội chủ nghĩa mang bản chất của giai cấp nào?
+*a. Giai cấp công nhân
+b. Quần chúng nhân dân
+c. Giai cấp nông dân
+d. Tầng lớp trí thức
+
+Câu 174: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam mang bản chất của giai cấp nào?
+a. Giai cấp tư sản
+b. Giai cấp nông dân
+c. Đội ngũ trí thức
+*d. Giai cấp công nhân
+
+Câu 175: Điền vào chỗ trống: “Nhà nước pháp quyền xã hội chủ nghĩa ở nước ta đặt dưới sự lãnh đạo của Đảng Cộng sản Việt Nam, phải thực thi quyền … của nhân dân trên tất cả lĩnh vực của đời sống xã hội, thể hiện bằng Hiến pháp và pháp luật.”
+a. Kinh doanh
+b. Bình đẳng
+c. Tự do
+*d. Dân chủ
+
+Câu 176: Bản chất chính trị của nền dân chủ xã hội chủ nghĩa là gì?
+a. Là nền dân chủ của giai cấp công nhân thông qua chính đảng của nó để cải tạo xã hội cũ và xây dựng xã hội mới
+b. Là nền dân chủ của giai cấp công nhân và nhân dân lao động thực hiện quyền lực đối với toàn xã hội
+c. Là nền dân chủ phi giai cấp
+*d. Là nền dân chủ có tính nhân dân rộng rãi và tính dân tộc sâu sắc
+
+Câu 177: Cơ quan quyền lực cao nhất ở nước ta là:
+a. Đảng Cộng sản
+b. Nhà nước pháp quyền
+*c. Quốc hội
+d. Chính phủ
+
+Câu 178: Bản chất xã hội của dân chủ xã hội chủ nghĩa được thể hiện như thế nào?
+a. Hình thành và phát triển dưới sự lãnh đạo của Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+*b. Là sự kết hợp hài hòa về lợi ích giữa cá nhân, tập thể và lợi ích toàn xã hội
+c. Hình thành và phát triển một cách tự giác, đặt dưới sự lãnh đạo của giai cấp công nhân thông qua tổ chức Đảng, có sự quản lý của nhà nước xã hội chủ nghĩa
+d. Luôn có sự kế thừa trong bất cứ thời kỳ nào của lịch sử
+
+Câu 179: Sự ra đời của nền dân chủ xã hội chủ nghĩa đánh dấu bước phát triển mới về điều gì?
+a. Nội dung của dân chủ
+*b. Chất của dân chủ
+c. Gía trị của dân chủ
+d. Lượng của dân chủ
+
+Câu 180: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam mang bản chất của giai cấp nào?
+a. Giai cấp nông dân
+b. Đội ngũ trí thức
+*c. Giai cấp công nhân
+d. Giai cấp tư sản
+
+Câu 181: Dân chủ xã hội chủ nghĩa có mối quan hệ như thế nào với việc xây dựng và hoạt động của nhà nước xã hội chủ nghĩa?
+a. Là cơ sở, động lực
+b. Là cơ sở, điều kiện
+*c. Là cơ sở, nền tảng
+d. Là cơ sở, cách thức
+
+Câu 182: Bản chất chính trị của Nhà nước xã hội chủ nghĩa được biểu hiện bản chất của giai cấp, tầng lớp nào?
+*a. Giai cấp công nhân
+b. Giai cấp nông dân
+c. Tầng lớp trí thức
+d. Nhân dân lao động
+
+Câu 183: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam phải đảm bảo quyền gì của nhân dân?
+a. Quyền sở hữu tư nhân là quyền cao nhất
+b. Quyền tự do ngôn luận không bị kiểm soát
+*c. Quyền con người là cao nhất
+d. Quyền kinh doanh không giới hạn
+
+Câu 184: Nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam hoạt động được giám sát bởi nhân dân theo phương châm:
+a. Dân kiểm tra, dân bàn, dân biết, dân làm
+b. Dân bàn, dân biết, dân kiểm tra, dân làm
+*c. Dân biết, dân bàn, dân làm, dân kiểm tra
+d. Dân làm, dân bàn, dân biết, dân kiểm tra
+
+Câu 185: Nhà nước xã hội chủ nghĩa trở thành công cụ quan trọng trong việc thực thi quyền cơ bản gì của nhân dân?
+a. Quyền làm chủ chính trị của nhân dân
+b. Quyền làm chủ kinh tế của nhân dân
+c. Quyền làm chủ văn hóa của nhân dân
+*d. Quyền làm chủ của nhân dân
+
+Câu 186: Cơ quan quyền lực cao nhất ở nước ta là:
+*a. Quốc hội
+b. Chính phủ
+c. Đảng Cộng sản
+d. Nhà nước pháp quyền
+
+Câu 187: Căn cứ vào phạm vi tác động của quyền lực nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng đối nội, chức năng chính trị
+*b. Chức năng đối nội, chức năng đối ngoại
+c. Chức năng giai cấp, chức năng xã hội
+d. Chức năng kinh tế, chức năng chính trị
+
+Câu 188: Bản chất văn hóa – xã hội của Nhà nước xã hội chủ nghĩa được xây dựng trên nền tảng tinh thần nào?
+a. Là nhà nước dân chủ và pháp quyền
+**b. Lý luận của Chủ nghĩa Mác- Lênin và những giá trị văn hóa tiên tiến của nhân loại đồng thời mang những bản sắc riêng của dân tộc.
+c. Nhân dân là chủ thể tối cao của quyền lực nhà nước
+d. Là biểu hiện tập trung của khối đại đoàn kết toàn dân tộc
+
+Câu 189: Quan niệm của chủ nghĩa Mác Lênin về dân chủ được thể hiện trong những lĩnh vực nào?
+a. Kinh tế, xã hội, tư tưởng
+*b. Chính trị, kinh tế, văn hóa, xã hội
+c. Kinh tế, chính trị, văn hóa, tư tưởng
+d. Kinh tế, chính trị, tư tưởng
+
+Câu 190: Để đảm bảo dân chủ, dân chủ phải gắn liền với kỷ cương và phải được thể chế hóa bằng gì?
+a. Mệnh lệnh hành chính
+b. Chính sách kinh tế
+c. Nghị quyết của Đảng
+*d. Pháp luật
+
+Câu 191: Căn cứ vào tính chất và quyền lực của nhà nước, chức năng Nhà nước xã hội chủ nghĩa được chia thành những chức năng nào?
+a. Chức năng kinh tế, chức năng chính trị
+*b. Chức năng giai cấp, chức năng xã hội
+c. Chức năng đối nội, chức năng đối ngoại
+d. Chức năng đối nội, chức năng chính trị
+
+Câu 192: “Nước ta là nước dân chủ. Bao nhiêu lợi ích đều vì dân. Bao nhiêu quyền hạn đều là của dân... Nói tóm lại, quyền hành và lực lượng đều ở dân”. Nhận định trên của ai?
+a. Lê Duẩn
+b. Trường Chinh
+c. Phạm Văn Đồng
+*d. Hồ Chí Minh
+
+Câu 193: Đảng Cộng sản Việt Nam khẳng định đặc trưng bản chất của chủ nghĩa xã hội Việt Nam là:
+*a. Do nhân dân làm chủ
+b. Do tầng lớp trí thức làm chủ
+c. Do giai cấp nông dân làm chủ
+d. Do giai cấp công nhân làm chủ
+
+Câu 194: Một trong những nội dung trong việc tiếp tục xây dựng và hoàn thiện Nhà nước pháp quyền xã hội chủ nghĩa:
+a. Xây dựng và từng bước hoàn thiện các hệ thống giám sát, phản biện xã hội
+b. Nâng cao vai trò của các tổ chức chính trị - xã hội
+*c. Đấu tranh phòng, chống tham nhũng, lãng phí, thực hành tiết kiệm
+d. Xây dựng, hoàn thiện thể chế kinh tế thị trường định hướng xã hội chủ nghĩa
+
+Câu 195: “Nước ta là nước dân chủ. Bao nhiêu lợi ích đều vì dân. Bao nhiêu quyền hạn đều là của dân.. Nói tóm lại, quyền hành và lực lượng đều ở dân”. Nhận định trên của ai?
+a. Lê Duẩn
+*b. Hồ Chí Minh
+c. Phạm Văn Đồng
+d. Trường Chinh
+
+Câu 196: Yếu tố nào sau đây là điều kiện thực thi dân chủ xã hội chủ nghĩa:
+a. Xây dựng Đảng Cộng sản Việt Nam trong sạch, vững mạnh
+*b. Xây dựng nhà nước pháp quyền xã hội chủ nghĩa vững mạnh
+c. Nâng cao vai trò của các tổ chức chính trị - xã hội
+d. Xây dựng, hoàn thiện thể chế kinh tế thi trường
+
+Câu 197: Bản chất kinh tế của Nhà nước xã hội chủ nghĩa thể hiện ở quan hệ sản xuất gì?
+a. Quan hệ sản xuất cá thể về tư liệu sản xuất
+b. Quan hệ sản xuất tư nhân về tư liệu sản xuất
+c. Quan hệ sản xuất tàn dư về tư liệu sản xuất
+*d. Quan hệ sản xuất công hữu về tư liệu sản xuất
+
+Câu 198: Thách thức lớn nhất trong việc xây dựng nhà nước pháp quyền xã hội chủ nghĩa ở Việt Nam hiện nay là:
+*a. Tham nhũng, lãng phí
+b. Sự bất bình đẳng về thu nhập
+c. Ý thức pháp luật của công dân
+d. Tệ nạn xã hội
+
+Câu 199: Để xây dựng, hoàn thiện thể chế kinh tế thị trường định hướng xã hội chủ nghĩa tạo ra cơ sở kinh tế vững chắc cho xây dựng dân chủ xã hội chủ nghĩa cần phải:
+a. Phát triển đồng bộ các yếu tố thị trường và các loại thị trường
+b. Nhận thức đúng đắn về vai trò quan trọng của thể chế, xây dựng hoàn thiện thể chế
+c. Phát triển đa dạng các hình thức sở hữu, thành phần kinh tế, loại hình doanh nghiệp
+*d. Bao gồm các đáp án
+
+Câu 200: Một trong những nội dung tiếp tục xây dựng và hoàn thiện nhà nước pháp quyền xã hội chủ nghĩa ở nước ta hiện nay là gì?
+*a. Đấu tranh phòng chống tham nhũng, lãng phí, thực hành tiết kiệm
+b. Xây dựng các tổ chức nhà nước vững mạnh
+c. Nâng cao vai trò quản lý của các tổ chức nhà nước
+d. Hoàn thiện các hệ thống giám sát, phản biện xã hội.
+
+`;
+
+        const uiImport = document.getElementById('screen-import');
+        const uiSetup = document.getElementById('screen-setup');
+        const uiQuiz = document.getElementById('screen-quiz');
+        const uiResult = document.getElementById('screen-result');
+        const btnStart = document.getElementById('btn-start');
+        const errorMsg = document.getElementById('import-error');
+
+        function parseAndProceed() {
+            const raw = document.getElementById('import-textarea').value;
+            if(!raw.trim()) {
+                showError("Vui lòng dán dữ liệu câu hỏi!");
+                return;
+            }
+
+            // Tách các block bằng regex tìm chữ Câu X:
+            const blocks = raw.split(/(?=Câu\s*\d+[:.-])/i).filter(b => b.trim().length > 0);
+            database = [];
+
+            blocks.forEach((block) => {
+                const lines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                if(lines.length < 2) return;
+
+                // Lọc bỏ tiền tố "Câu X:", "[Câu X]" cũ để tự đánh số lại
+                let rawQ = lines[0];
+                let cleanQ = rawQ.replace(/^(Câu\s*\d+[:.-]?\s*|\[Câu\s*\d+\]\s*)/i, '').trim();
+
+                const options = [];
+                let correctIdx = 0;
+
+                for(let i = 1; i < lines.length; i++) {
+                    let text = lines[i];
+                    
+                    // Kiểm tra đáp án đúng (có dấu *)
+                    if(text.startsWith('*')) {
+                        correctIdx = options.length;
+                        text = text.substring(1).trim(); 
+                    }
+                    
+                    // Lọc bỏ tiền tố A, B, C, D có sẵn để dùng layout UI
+                    text = text.replace(/^[a-d][.)]\s*/i, '').trim();
+                    options.push(text);
+                }
+
+                if(options.length >= 2) {
+                    database.push({ q: cleanQ, options, correct: correctIdx });
+                }
+            });
+
+            if(database.length === 0) {
+                showError("Lỗi: Không trích xuất được câu hỏi. Hãy đảm bảo đúng định dạng bắt đầu bằng 'Câu...'");
+                return;
+            }
+
+            document.getElementById('total-loaded').innerText = database.length;
+            errorMsg.classList.add('hidden');
+            switchScreen(uiImport, uiSetup);
+        }
+
+        function showError(msg) {
+            errorMsg.innerText = msg;
+            errorMsg.classList.remove('hidden');
+        }
+
+        function selectMode(count) {
+            if(count === 'ALL') {
+                selectedCount = database.length;
+            } else {
+                selectedCount = Math.min(count, database.length);
+            }
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.style.borderColor = '#0ff';
+                btn.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.1)';
+                btn.classList.remove('bg-[#0ff]', 'bg-opacity-20');
+            });
+
+            let activeBtn = count === 30 ? 'btn-mode-30' : (count === 50 ? 'btn-mode-50' : 'btn-mode-all');
+            let btnEl = document.getElementById(activeBtn);
+            btnEl.style.borderColor = '#fff';
+            btnEl.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.8), inset 0 0 20px rgba(0, 255, 255, 0.4)';
+            btnEl.classList.add('bg-[#0ff]', 'bg-opacity-20');
+
+            btnStart.disabled = false;
+        }
+
+        function startQuiz() {
+            // Trộn toàn bộ data và cắt lấy số lượng cần thiết (Đảm bảo KHÔNG TRÙNG LẶP)
+            let shuffledDB = [...database].sort(() => 0.5 - Math.random());
+            activeQuizList = shuffledDB.slice(0, selectedCount);
+            
+            currentIndex = 0;
+            currentScore = 0;
+            document.getElementById('ui-total-q').innerText = activeQuizList.length;
+            
+            switchScreen(uiSetup, uiQuiz, () => {
+                renderQuestion();
+            });
+        }
+
+        function renderQuestion() {
+            if(currentIndex >= activeQuizList.length) {
+                endQuiz();
+                return;
+            }
+
+            isTransitioning = false;
+            isCurrentQuestionFailed = false;
+            let qData = activeQuizList[currentIndex];
+
+            // Cập nhật UI Header
+            document.getElementById('ui-current-q').innerText = currentIndex + 1;
+            document.getElementById('ui-score').innerText = currentScore;
+            
+            // Render Câu hỏi (Đánh số động từ 1 -> 30/50...)
+            let qBox = document.getElementById('box-q');
+            let qText = document.getElementById('text-question');
+            
+            qBox.classList.remove('fade-up');
+            void qBox.offsetWidth;
+            qBox.classList.add('fade-up');
+            qText.innerText = `Câu ${currentIndex + 1}: ${qData.q}`;
+
+            // Render Options
+            for(let i=0; i<4; i++) {
+                let btn = document.getElementById(`opt-${i}`);
+                let txt = document.getElementById(`text-opt-${i}`);
+                
+                btn.className = `neon-box rounded-xl p-6 text-left font-medium text-lg fade-up delay-${i+2} hover:bg-[#0ff] hover:bg-opacity-10 group`;
+                
+                if(i < qData.options.length) {
+                    btn.disabled = false;
+                    btn.style.display = 'block';
+                    txt.innerText = qData.options[i];
+                } else {
+                    btn.style.display = 'none'; // Ẩn nếu câu có ít hơn 4 đáp án
+                }
+            }
+        }
+
+        function checkAnswer(optIndex, btnEl) {
+            if(isTransitioning) return;
+
+            let qData = activeQuizList[currentIndex];
+
+            if(optIndex === qData.correct) {
+                btnEl.classList.add('opt-correct');
+                
+                if(!isCurrentQuestionFailed) {
+                    currentScore++;
+                    document.getElementById('ui-score').innerText = currentScore;
+                }
+
+                isTransitioning = true;
+                
+                setTimeout(() => {
+                    currentIndex++;
+                    renderQuestion();
+                }, 1200);
+            } else {
+                btnEl.classList.add('opt-incorrect');
+                btnEl.disabled = true;
+                isCurrentQuestionFailed = true;
+            }
+        }
+function skipQuestion() {
+    if(isTransitioning) return;
+    
+    // Đánh dấu chuyển câu để chặn bấm các nút khác
+    isTransitioning = true;
+    
+    // Tăng thứ tự câu hỏi và hiển thị câu mới ngay lập tức
+    currentIndex++;
+    renderQuestion();
+}
+        function endQuiz() {
+            document.getElementById('res-score').innerText = currentScore;
+            document.getElementById('res-total').innerText = activeQuizList.length;
+            let percent = Math.round((currentScore / activeQuizList.length) * 100);
+            document.getElementById('res-percent').innerText = `${percent}%`;
+
+            switchScreen(uiQuiz, uiResult, () => {
+                if(percent >= 50) {
+                    var duration = 3000;
+                    var end = Date.now() + duration;
+                    (function frame() {
+                        confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#0ff', '#0f0'] });
+                        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#0ff', '#0f0'] });
+                        if (Date.now() < end) requestAnimationFrame(frame);
+                    }());
+                }
+            });
+        }
+
+        function resetApp() {
+            selectedCount = 0;
+            btnStart.disabled = true;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.style.borderColor = '#0ff';
+                btn.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.1)';
+                btn.classList.remove('bg-[#0ff]', 'bg-opacity-20');
+            });
+            switchScreen(uiResult, uiSetup, null);
+        }
+
+        function switchScreen(fromEl, toEl, callback) {
+            fromEl.classList.add('opacity-0');
+            setTimeout(() => {
+                fromEl.classList.add('hidden');
+                toEl.classList.remove('hidden');
+                void toEl.offsetWidth;
+                toEl.classList.remove('opacity-0');
+                if(callback) setTimeout(callback, 100);
+            }, 500);
+        }
+window.onload = function() {
+    // Ẩn màn hình import ban đầu và thay luôn dữ liệu vào ô text
+    document.getElementById('import-textarea').value = myPreloadedData.trim();
+    
+    // Chạy luôn hàm xử lý dữ liệu
+    parseAndProceed();
+    
+    // Cập nhật lại giao diện để bỏ qua hiệu ứng chuyển cảnh chậm chạp lúc mới vào
+    uiImport.classList.add('hidden');
+    uiSetup.classList.remove('hidden');
+    uiSetup.classList.remove('opacity-0');
+};
+    </script>
+</body>
+</html>
